@@ -6,11 +6,11 @@ import { prepareScene } from '../lib/story/scene.mjs';
 import { initialStory } from '../lib/story/world.mjs';
 import { INTENT_RESPONSE_SCHEMA, SCENE_RESPONSE_SCHEMA } from '../lib/story/output-schemas.mjs';
 const connection = { provider: 'gemini', model: 'gemini-3.6-flash', key: 'test-key-not-real' };
-test('Gemini sends structured schema and reads only final answer parts', async () => {
+test('Gemini uses compatible JSON mode without hard schema and reads only final answer parts', async () => {
   const result = await generateJSON(connection, 'system', {}, async (url, init) => {
     const body = JSON.parse(init.body);
     assert.equal(body.generationConfig.maxOutputTokens, 8192);
-    assert.deepEqual(body.generationConfig.responseSchema, INTENT_RESPONSE_SCHEMA);
+    assert.equal(body.generationConfig.responseSchema, undefined);
     assert.equal(body.generationConfig.responseMimeType, 'application/json');
     assert(!init.body.includes(connection.key));
     return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [
@@ -18,6 +18,24 @@ test('Gemini sends structured schema and reads only final answer parts', async (
     ] } }] });
   }, { responseSchema: INTENT_RESPONSE_SCHEMA });
   assert.deepEqual(result, { kind: 'continue' });
+});
+test('Gemini HTTP 400 diagnostics are safe and never automatically retry', async () => {
+  const cases = [
+    ['Invalid JSON payload: response_schema too complex', '結構化輸出'],
+    ['maxOutputTokens exceeds allowed limit', '輸出長度'],
+    ['API key not valid: private-key', '金鑰無效'],
+    ['Input token count exceeds limit: private-story', '輸入長度'],
+    ['Developer instruction is not enabled', '系統指令'],
+    ['Unknown error containing private-key and private-story', '未能安全判定'],
+  ];
+  for (const [message, expected] of cases) {
+    let calls = 0;
+    await assert.rejects(generateJSON(connection, '', {}, async () => {
+      calls++;
+      return Response.json({ error: { code: 400, message } }, { status: 400 });
+    }), error => error.message.includes(expected) && !/private-key|private-story/.test(error.message));
+    assert.equal(calls, 1);
+  }
 });
 test('truncated response never commits state or triggers extra provider calls, even if JSON parses', async () => {
   const state = initialStory('truncated-gemini'), before = JSON.stringify(state);
