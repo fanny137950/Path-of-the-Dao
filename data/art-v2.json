@@ -1,0 +1,17 @@
+{
+  "portraits": {
+    "player": "/art/luohe-dialogue-v3.png",
+    "shen": "/art/shen-dialogue-v2.png",
+    "yan": "/art/yan-dialogue-v3.png",
+    "jiang": "/art/jiang-dialogue-v3.png",
+    "gu": "/art/gu-dialogue-v3.png"
+  },
+  "scenes": {
+    "home": "/art/courtyard-v3.png",
+    "room": "/art/scene-room-v2.png",
+    "court": "/art/scene-court-v2.png",
+    "library": "/art/scene-library-v2.png",
+    "square": "/art/scene-square-v2.png",
+    "gate": "/art/scene-gate-v2.png"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "id": "taixu",
+  "npcs": {
+    "shen": {
+      "name": "沈滄月",
+      "role": "棲風峰峰主",
+      "realm": "元嬰後期",
+      "personality": "冷靜、嚴格、保護弟子而不溺愛",
+      "voice": "先把根基站穩。"
+    },
+    "yan": {
+      "name": "晏清辭",
+      "role": "大師姐",
+      "realm": "金丹初期",
+      "personality": "自律、敏銳、行事穩妥",
+      "voice": "有事先說，不要硬撐。"
+    },
+    "jiang": {
+      "name": "江離",
+      "role": "二師兄",
+      "realm": "築基後期",
+      "personality": "溫和、愛開玩笑、願意收尾",
+      "voice": "小師妹，今天又有什麼新打算？"
+    },
+    "gu": {
+      "name": "顧長青",
+      "role": "三師兄",
+      "realm": "築基中期",
+      "personality": "寡言、細心、務實",
+      "voice": "慢慢來。"
+    }
+  },
+  "places": {
+    "gate": {
+      "name": "太虛宗山門",
+      "parent": "taixu",
+      "x": 18,
+      "y": 78,
+      "description": "雲霧繞過青石階，山門上的太虛二字隱隱泛光。"
+    },
+    "square": {
+      "name": "主峰廣場",
+      "parent": "main",
+      "x": 46,
+      "y": 58,
+      "description": "廣場鐘聲悠長，弟子們沿白石山道往來。"
+    },
+    "library": {
+      "name": "藏經樓",
+      "parent": "main",
+      "x": 76,
+      "y": 44,
+      "description": "木架間滿是紙墨氣息，一縷晨光落在舊卷上。"
+    },
+    "court": {
+      "name": "演武場",
+      "parent": "qifeng",
+      "x": 60,
+      "y": 25,
+      "description": "山風穿過松林，石坪上留下淡淡的劍痕。"
+    },
+    "home": {
+      "name": "棲風峰庭院",
+      "parent": "qifeng",
+      "x": 30,
+      "y": 25,
+      "description": "青竹與松影環繞庭院，遠山浮在雲海之上。"
+    },
+    "room": {
+      "name": "洛河居所",
+      "parent": "home",
+      "x": 14,
+      "y": 12,
+      "description": "窗前一張木案、一盞油燈，床邊放著練習用的木劍。"
+    }
+  },
+  "edges": [
+    [
+      "gate",
+      "square",
+      30
+    ],
+    [
+      "square",
+      "library",
+      10
+    ],
+    [
+      "square",
+      "court",
+      25
+    ],
+    [
+      "court",
+      "home",
+      10
+    ],
+    [
+      "home",
+      "room",
+      2
+    ]
+  ]
+}

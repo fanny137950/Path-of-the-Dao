@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {heldStep,MotionPresentation,animationCell} from '../lib/game/navigation.mjs';
+import {laboratory,turn,positionOf} from '../lib/game/engine.mjs';
+import VISUALS from '../data/character-visuals.json' with {type:'json'};
+test('按住方向鍵在網路待確認期間仍保留，不依鍵盤重複事件',()=>{const keys=new Set(['w']),motion=new MotionPresentation({x:0,z:10});motion.propose({x:-4.9,z:5.1});for(let i=0;i<10;i++)motion.tick(1/60);assert.ok(motion.pose.x<0);assert.ok(motion.pending);assert.ok(Math.abs(heldStep(keys).x+7/Math.sqrt(2))<1e-8);motion.confirm({x:-4.9,z:5.1});assert.ok(heldStep(keys));keys.delete('w');assert.equal(heldStep(keys),null);});
+test('失敗回合只回復顯示，沒有改動正式世界位置',()=>{const s=laboratory('reject'),before=structuredClone(s),motion=new MotionPresentation(s.player.position);motion.propose({x:5,z:10});motion.tick(.2);assert.ok(motion.pose.x>0);motion.reject(s.player.position);for(let i=0;i<60;i++)motion.tick(1/60);assert.deepEqual({x:motion.pose.x,z:motion.pose.z},s.player.position);assert.deepEqual(s,before);});
+test('步態相位依移動距離累積，不因網路確認重置',()=>{const m=new MotionPresentation({x:0,z:0});m.propose({x:7,z:0});m.tick(.3);const phase=m.pose.phase;m.confirm({x:7,z:0});m.propose({x:14,z:0});m.tick(.1);assert.ok(m.pose.phase>phase);const old=m.pose.phase;m.tick(0);assert.equal(m.pose.phase,old);});
+test('反向鍵互相抵銷，雙鍵不加倍速度',()=>{assert.equal(heldStep(new Set(['w','s'])),null);assert.deepEqual(heldStep(new Set(['w','ArrowUp'])),heldStep(new Set(['w'])));assert.ok(Math.abs(Math.hypot(...Object.values(heldStep(new Set(['w','d']))))-7)<1e-9);});
+test('實驗場沈滄月跨日仍固定，不影響一般世界作息',()=>{let s=laboratory('stationary');const p=positionOf(s,'shen');s=turn(s,{id:'day',revision:0,action:{type:'wait',minutes:1440}});assert.deepEqual(positionOf(s,'shen'),p);assert.equal(s.npcs.shen.location,'home');assert.equal(s.npcs.shen.travel,null);});
+test('簡化洛河圖集為四方向八幀，立繪路徑沿用',()=>{const p=VISUALS.profiles.player;assert.equal(p.atlas.columns,8);assert.equal(p.atlas.rows,4);assert.equal(p.portrait.path,'/art/dialogue-lab-v1.png');assert.deepEqual(animationCell({...p.atlas,rowOffset:0},1,true,.25),{column:3,row:1});});
