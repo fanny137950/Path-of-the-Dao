@@ -48,4 +48,18 @@ bash scripts/sites-env.sh -- node node_modules/wrangler/bin/wrangler.js dev --co
 
 86 個 Node 測試、18 個 SQLite 測試、4 個部署流程測試、TypeScript、建置及 Wrangler 部署 dry-run 通過。完整本機 Worker 以 Chromium 驗證密碼登入、Secure/HttpOnly Cookie、拒絕偽造身份、建立世界、回合、存檔、重載、開發者存取、登出與手機登入頁；重新啟動 Worker 後，會話與存檔仍可讀取。
 
-正式 Cloudflare 帳號、資源建立、遠端遷移及公開網址尚未驗證，必須在帳號連線完成後執行部署與上線檢查。
+2026-10-09 已完成正式 Cloudflare 帳號連線、D1 建立、遠端遷移與私人 Worker 發布。
+
+## 金鑰代理環境中的可操作預覽
+
+此雲端環境的金鑰代理接受帳號 API Token，但拒絕 Workers Static Assets 上傳所用的臨時 JWT。因此另提供預覽發布方式：
+
+```sh
+WENDAO_ASSET_MODE=embedded-preview python scripts/deploy-cloudflare.py
+```
+
+這會將建置完成的 JavaScript、CSS 與 SVG 嵌入 Worker 模組，免用 Static Assets 上傳。人物及場景 PNG 由 Worker 讀取此公開儲存庫的固定 commit，依精確檔案清單提供並快取；建置時比對該 commit 圖片與本機輸出逐位元相同。訪客的 Cookie、認證標頭與查詢參數不會傳給 GitHub。此預覽依賴 GitHub 原始檔服務的可用性，適合先試玩；一般部署仍可使用原本 Static Assets 路徑。
+
+私人登入、D1 存檔與後台均使用實際服務，沒有替換為示範 API。AI 對話仍需玩家在遊戲設定中連接模型。此新站不包含原 Sites 舊存檔。
+
+登入資訊仍存於 `.sites-runtime/cloudflare/owner-login.txt`，不要提交到 Git。新增預覽資產測試驗證靜態路由、身份資料不轉送及失敗回應。

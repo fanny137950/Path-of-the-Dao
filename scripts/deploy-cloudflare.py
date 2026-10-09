@@ -76,8 +76,12 @@ def main():
         private_json(target_file, target)
     env = {**os.environ, 'WENDAO_D1_DATABASE_ID': database, 'WENDAO_WORKER_NAME': name, 'CI': 'true'}
     run(['node', 'scripts/prepare-cloudflare.mjs'], env=env)
+    config = CONFIG
+    if os.environ.get('WENDAO_ASSET_MODE') == 'embedded-preview':
+        run(['node', 'scripts/prepare-preview.mjs'], env=env)
+        config = 'dist/server/wrangler.preview.json'
     def wrangler(*args, input=None):
-        run(['bash', 'scripts/sites-env.sh', '--', 'node', 'node_modules/wrangler/bin/wrangler.js', *args, '--config', CONFIG], input=input, env=env)
+        run(['bash', 'scripts/sites-env.sh', '--', 'node', 'node_modules/wrangler/bin/wrangler.js', *args, '--config', config], input=input, env=env)
     secret_file = STATE / 'worker-secrets.json'
     if not secret_file.exists():
         if existing:
