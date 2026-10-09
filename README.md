@@ -31,6 +31,8 @@ python tests/story_database_test.py
 
 ## 文件
 
+- [獨立 Cloudflare 私人版部署](docs/CLOUDFLARE.md)
+
 - [目前行為、資料流與限制](docs/STORY-V2.md)
 - [GitHub 原始碼交付](docs/GITHUB.md)
 - [前版持久化設計](docs/STORY-V1.md)

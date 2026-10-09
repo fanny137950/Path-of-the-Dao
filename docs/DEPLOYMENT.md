@@ -1,5 +1,7 @@
 # 群像故事版本部署交接
 
+新增獨立部署選項：[Cloudflare 私人版](CLOUDFLARE.md)。可在自己的 Cloudflare 帳號發布，不依賴原 Work／Sites 的部署工具；原站與原資料庫保留。以下為原 Sites 站點的更新流程。
+
 部署目標是既有 Sites 專案 `appgprj_6ac865957e9c819185e3c5a276d401fb`，沿用其可信登入及正式 `DB` binding。這個儲存庫沒有 GitHub Actions 自動部署工作流程，推送分支本身不代表網站已發布。
 
 ## 發布順序
