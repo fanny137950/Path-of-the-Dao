@@ -59,7 +59,7 @@ class StoryDatabaseTests(unittest.TestCase):
    self.add_message(n,f'message{n}',['player','shen'])
   self.db.execute("INSERT INTO event_ledger SELECT 'b','b'||substr(id,2),minute,type,location,content,source,replace(replace(data,'a:','b:'),'\"timeline\":\"a\"','\"timeline\":\"b\"') FROM event_ledger WHERE world='a' AND CAST(substr(id,4) AS INTEGER)<=2")
   self.db.execute("INSERT INTO actor_knowledge SELECT 'b',actor,'b'||substr(event,2),acquired,status FROM actor_knowledge WHERE world='a' AND CAST(substr(event,4) AS INTEGER)<=2")
-  self.db.execute("INSERT INTO story_messages SELECT 'b','b'||substr(id,2),seq,minute,location,speaker,kind,content,audience,event,performance FROM story_messages WHERE world='a' AND seq<=2")
+  self.db.execute("INSERT INTO story_messages(world,id,seq,minute,location,speaker,kind,content,audience,event,performance) SELECT 'b','b'||substr(id,2),seq,minute,location,speaker,kind,content,audience,event,performance FROM story_messages WHERE world='a' AND seq<=2")
   self.assertEqual(self.db.execute("SELECT id FROM event_ledger WHERE world='b' ORDER BY id").fetchall(),[('b:e1',),('b:e2',)])
   self.assertEqual(self.db.execute("SELECT count(*) FROM story_messages WHERE world='b'").fetchone()[0],2)
   self.assertEqual(json.loads(self.db.execute("SELECT data FROM event_ledger WHERE world='b' LIMIT 1").fetchone()[0])['timeline'],'b')
@@ -67,7 +67,7 @@ class StoryDatabaseTests(unittest.TestCase):
   performance={'to':'jiang','expression':'calm','delivery':'平靜地放下茶杯','historyRefs':['shen:teaching-notes:v1']}
   self.db.execute('INSERT INTO story_messages(world,id,seq,minute,location,speaker,kind,content,audience,event,performance) VALUES (?,?,?,?,?,?,?,?,?,?,?)',('a','a:m1',1,1,'home','shen','dialogue','先坐下',json.dumps(['player','shen','jiang']),None,json.dumps(performance)))
   self.db.execute("INSERT INTO worlds VALUES ('b','owner','branch',0,'{}','now')")
-  self.db.execute("INSERT INTO story_messages SELECT 'b','b:m1',seq,minute,location,speaker,kind,content,audience,event,performance FROM story_messages WHERE world='a'")
+  self.db.execute("INSERT INTO story_messages(world,id,seq,minute,location,speaker,kind,content,audience,event,performance) SELECT 'b','b:m1',seq,minute,location,speaker,kind,content,audience,event,performance FROM story_messages WHERE world='a'")
   row=self.db.execute("SELECT performance FROM story_messages WHERE world='b'").fetchone()[0]
   self.assertEqual(json.loads(row),performance)
   with self.assertRaises(sqlite3.IntegrityError):self.db.execute("UPDATE story_messages SET performance='{}' WHERE world='a'")
@@ -83,3 +83,4 @@ class StoryDatabaseTests(unittest.TestCase):
   self.assertEqual(rows,[('我害怕被遺忘',)])
   self.assertEqual(self.db.execute("SELECT count(*) FROM actor_knowledge WHERE actor='gu'").fetchone()[0],0)
 if __name__=='__main__':unittest.main()
+

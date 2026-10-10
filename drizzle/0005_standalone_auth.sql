@@ -3,3 +3,4 @@ CREATE TABLE `auth_login_limits` (
 	`attempts` integer NOT NULL,
 	`expires` integer NOT NULL
 );
+

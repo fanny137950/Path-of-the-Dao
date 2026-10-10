@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "893c4dd4-b1b9-4292-8b53-3d5bff86e6df",
+  "id": "3d7fe8ab-5422-4b27-b445-ba5c6af48cb7",
   "prevId": "9c12d234-42d7-4b83-9f95-3f529082e642",
   "tables": {
     "event_ledger": {
@@ -348,8 +348,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "performance": {
-          "name": "performance",
+        "presentation": {
+          "name": "presentation",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

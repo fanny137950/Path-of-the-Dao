@@ -1,9 +1,40 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "893c4dd4-b1b9-4292-8b53-3d5bff86e6df",
-  "prevId": "3d7fe8ab-5422-4b27-b445-ba5c6af48cb7",
+  "id": "35ffe503-732c-42b7-bf28-ffea73caabde",
+  "prevId": "893c4dd4-b1b9-4292-8b53-3d5bff86e6df",
   "tables": {
+    "auth_login_limits": {
+      "name": "auth_login_limits",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires": {
+          "name": "expires",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "event_ledger": {
       "name": "event_ledger",
       "columns": {
