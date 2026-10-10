@@ -12,10 +12,26 @@ test('oversized requests are not told that waiting alone will fix them',()=>{
  assert.match(result,/單純等待無法/);assert.match(result,/減少每回合資料/);
 });
 test('request and daily limits use only relevant reset headers',()=>{
- assert.match(message('requests per min (RPM)',{'x-ratelimit-reset-requests':'1m2.5s','x-ratelimit-reset-tokens':'9h'}),/等待 63 秒/);
+ assert.match(message('requests per min (RPM)',{'x-ratelimit-reset-requests':'1m2.5s','x-ratelimit-reset-tokens':'9h'}),/完整重置約 63 秒/);
  assert.match(message('requests per day (RPD)'),/每日請求次數/);
  assert.match(message('requests per day (RPD)'),/每日額度重置/);
  assert.match(message('rate limit',{'x-ratelimit-reset-tokens':'1m'}),/未提供等待時間/);
+});
+test('full bucket reset never overrides explicit per-request retry guidance',()=>{
+ const result=message('tokens per min (TPM): Limit 100000, Used 98727, Requested 2864. Please try again in 955ms.',{'x-ratelimit-reset-tokens':'11h27m19s'});
+ assert.match(result,/等待 1 秒/);assert(!result.includes('41239'));
+ const resetOnly=message('tokens per min (TPM)',{'x-ratelimit-reset-tokens':'11h27m19s'});
+ assert.match(resetOnly,/完整重置約 41239 秒/);assert(!resetOnly.includes('至少等待'));
+});
+test('milliseconds retain their units and do not turn into an eleven-hour wait',()=>{
+ assert.match(message('tokens per min (TPM)',{'retry-after-ms':'41239'}),/等待 42 秒/);
+ assert.match(message('Please try again in 41239ms.'),/等待 42 秒/);
+ const actualLong=message('tokens per min (TPM)',{'retry-after':'41239'});
+ assert.match(actualLong,/等待 41239 秒/);assert.match(actualLong,/來源：Retry-After/);assert.match(actualLong,/不一致/);
+});
+test('a token limit without a stated period is not labelled per-minute',()=>{
+ const result=rateLimitMessage({error:{type:'tokens',message:'Limit 100000, Used 98727, Requested 2864'}},new Headers());
+ assert.match(result,/AI Token 用量/);assert(!result.includes('每分鐘'));
 });
 test('Retry-After seconds and dates take precedence; malformed values are not echoed',()=>{
  assert.match(message('tokens per min',{'retry-after':'20','x-ratelimit-reset-tokens':'1m'}),/等待 20 秒/);

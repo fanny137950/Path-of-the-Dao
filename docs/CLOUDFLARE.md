@@ -62,4 +62,12 @@ WENDAO_ASSET_MODE=embedded-preview python scripts/deploy-cloudflare.py
 
 私人登入、D1 存檔與後台均使用實際服務，沒有替換為示範 API。AI 對話仍需玩家在遊戲設定中連接模型。此新站不包含原 Sites 舊存檔。
 
+## 免費模型連線
+
+遊戲設定新增「OpenRouter 免費模型」。在 https://openrouter.ai/settings/keys 建立自己的 Key，填入遊戲設定，模型可先用 `openrouter/free`。測試連線會先驗證金鑰，再讀取公開模型目錄；列出的其他模型必須同時符合 `:free`、輸入／輸出價格為零、文字輸出與 JSON 格式支援。
+
+生成請求只允許 `openrouter/free` 或 `:free` 模型，並設定 OpenRouter 的 `provider.max_price` 輸入／輸出上限均為零。沒有符合要求的路線時報錯，不切換付費模型。免費額度、速度與可用性仍由供應商決定。故事資料會送到 OpenRouter 與其所選供應商；Key 仍只留在頁面記憶體，不寫入存檔。
+
+已驗證公開模型清單與本機協定測試，真實生成需使用者在遊戲填入自己的 Key 後驗證。
+
 登入資訊仍存於 `.sites-runtime/cloudflare/owner-login.txt`，不要提交到 Git。新增預覽資產測試驗證靜態路由、身份資料不轉送及失敗回應。
