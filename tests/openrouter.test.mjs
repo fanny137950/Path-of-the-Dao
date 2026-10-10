@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {connection,generateJSON,testConnection} from '../lib/story/providers.mjs';
+import {SCENE_RESPONSE_SCHEMA} from '../lib/story/output-schemas.mjs';
 const settings={provider:'openrouter',sessionKey:'test-only-key',model:'openrouter/free'};
 test('OpenRouter only accepts free model IDs and enforces zero price on requests',async()=>{
  assert.throws(()=>connection({...settings,model:'vendor/paid'}),/免費/);
@@ -11,9 +12,22 @@ test('OpenRouter only accepts free model IDs and enforces zero price on requests
   const body=JSON.parse(init.body);
   assert.deepEqual(body.provider,{require_parameters:true,max_price:{prompt:0,completion:0}});
   assert.equal(body.model,'openrouter/free');assert.equal(body.response_format.type,'json_object');
+  assert.deepEqual(body.reasoning,{effort:'none'});assert.equal(body.max_tokens,2048);
   return Response.json({choices:[{finish_reason:'stop',message:{content:'{"kind":"continue"}'}}]});
  });
  assert.deepEqual(result,{kind:'continue'});
+});
+test('free scene generation gets room for complete JSON while requesting a compact scene',async()=>{
+ await generateJSON(connection(settings),'system',{},async(url,init)=>{
+  const body=JSON.parse(init.body);assert.equal(body.max_tokens,8192);assert.deepEqual(body.reasoning,{effort:'none'});
+  assert.match(body.messages[0].content,/3–5個短片段/);
+  return Response.json({choices:[{finish_reason:'stop',message:{content:'{"beats":[{"speaker":"shen","text":"坐下吧。"}]}'}}]});
+ },{responseSchema:SCENE_RESPONSE_SCHEMA});
+});
+test('free model truncated output still fails without an automatic generation retry',async()=>{
+ let calls=0;
+ await assert.rejects(generateJSON(connection(settings),'',{},async()=>{calls++;return Response.json({choices:[{finish_reason:'length',message:{content:'{"beats":['}}]});},{responseSchema:SCENE_RESPONSE_SCHEMA}),/資料被截斷/);
+ assert.equal(calls,1);
 });
 test('generation cannot bypass free-only validation by skipping connection helper',async()=>{
  let calls=0;await assert.rejects(generateJSON({provider:'openrouter',key:'fake',model:'vendor/paid'},'',{},async()=>{calls++;}),/免費/);assert.equal(calls,0);
