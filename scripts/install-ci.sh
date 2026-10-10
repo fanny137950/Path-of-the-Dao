@@ -191,3 +191,4 @@ await writeFile(
 );
 NODE
 echo "[sites] npm ci passed and vinext is available"
+
