@@ -15,6 +15,7 @@ type Character={
 type DeveloperData={
  revision:number;world:string;day:number;minute:number;location:string;
  characters:Record<string,Character>;bibleVersion?:number;
+ protagonist?:{name:string;age:number;gender?:string;hometown?:string;realm:string;spiritualRoot:string;aptitude?:{grade:string;description:string};family?:string[]};
  worldBible?:{title:string;sect?:{recruitment:{steps:string[]};peaks:{name:string;domain:string;leader:string;source:string}[]};
   cultivation?:{realmOrder:string[];hardRules:string[]};factions?:{name:string;region:string;stance:string}[]};
  events:{id?:string;text:string;reply:string;witnesses?:string[]}[];
@@ -87,6 +88,13 @@ export default function V3DeveloperPanel({
   {loading&&<p>正在從 D1 讀取世界資料……</p>}
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {notice&&<p className="v3-success">{notice}</p>}
+  {data?.protagonist&&<details className="v3-dev-dossier" open>
+    <summary>洛河 · 玩家主角資料（自由角色扮演）</summary>
+    <p>{data.protagonist.name}，{data.protagonist.gender||'女'}，{data.protagonist.age}歲，來自{data.protagonist.hometown||'青石鎮'}</p>
+    <p><strong>目前境界：</strong>{data.protagonist.realm}；<strong>靈根：</strong>{data.protagonist.spiritualRoot}；<strong>資質：</strong>{data.protagonist.aptitude?.grade||'未知'}</p>
+    <p><strong>家人：</strong>{data.protagonist.family?.join('；')}</p>
+    <p>洛河的思想、性格發展與重大決定由玩家控制，原型設定不限制玩家自由演出。</p>
+   </details>}
   {data&&<div className="v3-dev-grid">
    <aside className="v3-dev-actors">
     <p>第 {data.day} 日 · 共 {Object.keys(data.characters).length} 位人物 · 回合 {data.revision}</p>
