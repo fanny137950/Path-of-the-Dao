@@ -162,40 +162,43 @@ export function gmContext(world,userText){
  const scene='【客觀世界】第'+world.day+'日 '+Math.floor(world.minute/60)+':' +
   String(world.minute%60).padStart(2,'0')+'，地點'+world.location+'。洛河，'+
   world.protagonist.age+'歲，境界'+world.protagonist.realm+'，靈根'+world.protagonist.spiritualRoot+'。';
- const output=[
+ const core=[
   scene.slice(0,500),
   sceneContext(world,userText).slice(0,850),
-  ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。不在場NPC不能憑空旁聽、瞬移或知道他人的私密知情。').slice(0,220),
-  // Conversation is the primary GM context, never reconstructed from NPC
-  // memories or a quest ledger. Reserve it ahead of optional world dossiers.
+  ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。未在場的人不能突然知曉現場私事。').slice(0,220),
+  // Keep the *contiguous* latest conversation as guaranteed context, not
+  // optional tail content dropped by an oversized quest or NPC dossier.
   sceneConversationForGM(world,userText,5700),
-  episodicMemoriesForGM(world,userText,1000),
-  people.slice(0,1900),
-  loreForGM(world,userText,1250),
-  eventCalendarForGM(world,850),
-  npcAgencyForGM(world,650),
-  npcDecisionContext(world,300),
-  dailyTickForGM(world,300),
-  npcDailyPlanForGM(world,480),
-  worldPlanForGM(world).slice(0,250),
-  ('【較遠的重要舊事：僅供GM核對，不是現場人物的共同記憶】\n'+durable).slice(0,650),
-  chapters.slice(0,150),
   '【洛河最新輸入】'+userText,
   rootRule,
-  '【GM主動性】GM 必須管理NPC主動性，而非每回合只等洛河發令。讓NPC按照工作、立場、性格與眼前事件自行說話、互動、離場或引入新人物；並可表現真正在進行的宗門日常、已發生且角色有途徑知曉的世界事件。一般對話保持自然，避免每回合塞危機。玩家只說「繼續」時，應當至少讓眼前NPC採取一個有意義的新行動／說一句帶有新資訊的話，或讓可觀察的事件、時間與人物互動有所進展；不可只重複場景和詢問玩家要做什麼。若目前需要洛河親自決定是否觸碰、戰鬥、拜師等，GM 可以推進NPC的反應、催促或環境，但不能代洛河執行該決定。對話原文優先於記憶摘錄：記憶只表示人物個別狀態、知情與對洛河的看法；任務排程只用來核對時間與事件進度，不能取代自然對話。'
- ];
- // Fit optional sections without cutting the last (authoritative) user action
- // or GM constraints. Scene transcript has priority over background lore.
- const essential=output.slice(-3).filter(Boolean).join('\n\n');
- const available=11800-essential.length-2;
- let front='';
- for(const section of output.slice(0,-3).filter(Boolean)){
-  const spare=available-front.length-(front?2:0);
-  if(spare<=0)break;
-  front+=(front?'\n\n':'')+section.slice(0,spare);
+  '【回應原則】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
+ ].filter(Boolean);
+ const optional=[
+  people.slice(0,1500),
+  loreForGM(world,userText,1050),
+  episodicMemoriesForGM(world,userText,850),
+  eventCalendarForGM(world,650),
+  npcAgencyForGM(world,400),
+  npcDecisionContext(world,180),
+  npcDailyPlanForGM(world,240),
+  dailyTickForGM(world,150),
+  worldPlanForGM(world).slice(0,200),
+  ('【較遠經歷（GM核對用，非所有NPC共有記憶）】\n'+durable).slice(0,500),
+  chapters.slice(0,120)
+ ].filter(Boolean);
+ // Reserve the active dialogue and newest action before any optional records.
+ // Optional records may shrink, never silently displace the user's latest turn.
+ const limit=11800,coreText=core.join('\n\n');
+ let head=coreText;
+ for(const item of optional){
+  const left=limit-head.length-2;
+  if(left<=0)break;
+  // Preserve each optional section as a whole when possible.
+  if(item.length+2<=left)head+='\n\n'+item;
  }
- return (front?front+'\n\n':'')+essential;
+ return head.slice(0,limit);
 }
+
 const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
