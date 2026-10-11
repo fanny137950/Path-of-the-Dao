@@ -3,7 +3,7 @@ import {initialProgress,progressOf,prepareProgress,applyPreparedProgress,suggest
 export const V3_INTRO='太虛宗收徒大典。十五歲的洛河穿過山門，來到測試臺前。\n\n韓守一核對玉簡：「洛河，十五歲，名冊上有你。」\n\n他指向桌邊一塊泛著微光的測靈石：「手掌按上去便可測靈根。不急，也可以先問我測試規矩。」\n\n後面的隊伍正緩緩向前移動。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
 export const CONDITIONS=['健康','輕傷','受傷','重傷','休養'];
-export const LOCATIONS=['太虛宗山門','太虛宗主峰','棲風峰','演武場','藏經樓','內門居所'];
+export const LOCATIONS=['太虛宗山門','太虛宗主峰','棲風峰','演武場','藏經樓','內門居所','外門報到處'];
 const clone=x=>structuredClone(x);
 const shorten=(x,max=180)=>typeof x==='string'?x.trim().slice(0,max):'';
 const clamp=(n,min=-100,max=100)=>Math.min(max,Math.max(min,n));
