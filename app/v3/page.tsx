@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import './v3.css';
 import V3DeveloperPanel from '../../components/v3-developer-panel';
+import V3TaskDeveloperPanel from '../../components/v3-task-developer-panel';
 type Msg={role:'user'|'assistant';content:string};
 type SuggestedAction={label:string;text:string;kind?:'action'|'advance'};
 type Quest={id:string;title:string;type:string;status:string;description:string;objective:string;progress:number;updatedDay:number};
@@ -17,6 +18,7 @@ export default function V3(){
  const [text,setText]=useState('');const [busy,setBusy]=useState(false);
  const [apiKey,setApiKey]=useState('');const [model,setModel]=useState('openrouter/free');
  const [settings,setSettings]=useState(false);const [dev,setDev]=useState(false);
+ const [taskDev,setTaskDev]=useState(false);
  const [error,setError]=useState('');const [mode,setMode]=useState<'demo'|'ai'|'openrouter'>('demo');
  const [turn,setTurn]=useState(0);const [usage,setUsage]=useState<number|null>(null);
  const [worldId,setWorldId]=useState('');const [loading,setLoading]=useState(true);const [day,setDay]=useState(1);const [minute,setMinute]=useState(480);
@@ -54,7 +56,7 @@ export default function V3(){
   finally{if(active)setLoading(false)}})();
   // The initialization guard prevents duplicate worlds in React Strict Mode.
  },[]);
- useEffect(()=>{if(!settings&&!dev)bottom.current?.scrollIntoView({behavior:'smooth',block:'end'})},[messages,settings,dev]);
+ useEffect(()=>{if(!settings&&!dev&&!taskDev)bottom.current?.scrollIntoView({behavior:'smooth',block:'end'})},[messages,settings,dev,taskDev]);
  async function reset(){
   if(busy||loading||!confirm('重新建立自由劇情測試世界？這會切換到新的世界線，原有 D1 測試紀錄不會被刪除。'))return;
   setLoading(true);setError('');
@@ -71,7 +73,7 @@ export default function V3(){
   }catch(e){if(quickText===undefined)setText(value);setError(e instanceof Error?e.message:'連線失敗')}
   finally{setBusy(false)}
  }
- const panel=dev?'dev':settings?'settings':'story';
+ const panel=taskDev?'tasks':dev?'dev':settings?'settings':'story';
  const advanceTime=(minutes:number)=>{
   if(busy||loading||!worldId||text.trim())return;
   void send('等待時間流逝',minutes);
@@ -91,11 +93,13 @@ export default function V3(){
    </div>
    <nav className="v3-header-nav" aria-label="遊戲選單">
     <button type="button" className={panel==='story'?'v3-tab-active':''}
-     aria-pressed={panel==='story'} onClick={()=>{setDev(false);setSettings(false)}}>故事</button>
+     aria-pressed={panel==='story'} onClick={()=>{setDev(false);setSettings(false);setTaskDev(false)}}>故事</button>
     <button type="button" className={panel==='dev'?'v3-tab-active':''}
-     aria-pressed={panel==='dev'} onClick={()=>{setDev(!dev);setSettings(false)}}>人物管理</button>
+     aria-pressed={panel==='dev'} onClick={()=>{setDev(!dev);setSettings(false);setTaskDev(false)}}>人物管理</button>
+    <button type="button" className={panel==='tasks'?'v3-tab-active':''}
+     aria-pressed={panel==='tasks'} onClick={()=>{setTaskDev(!taskDev);setDev(false);setSettings(false)}}>任務管理</button>
     <button type="button" className={panel==='settings'?'v3-tab-active':''}
-     aria-pressed={panel==='settings'} onClick={()=>{setSettings(!settings);setDev(false)}}>AI 設定</button>
+     aria-pressed={panel==='settings'} onClick={()=>{setSettings(!settings);setDev(false);setTaskDev(false)}}>AI 設定</button>
    </nav>
   </header>
   <div className="v3-status-bar" role="status" aria-live="polite">
@@ -125,6 +129,7 @@ export default function V3(){
     <button className="v3-danger-btn" onClick={()=>void reset()} disabled={loading||busy}>開啟新測試世界</button></div>
   </section>}
   {panel==='dev'&&worldId&&<div className="v3-dev-workspace"><V3DeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/></div>}
+  {panel==='tasks'&&worldId&&<div className="v3-dev-workspace"><V3TaskDeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/></div>}
   {panel==='story'&&<>
    <div className="v3-play-layout">
     <aside className={'v3-quest-sidebar'+(journalOpen?' v3-journal-open':'')} aria-label="洛河已知的進行中任務">
@@ -155,7 +160,7 @@ export default function V3(){
      <div className="v3-content">{m.content}</div>
     </article>)}
     {!busy&&!loading&&suggestions.length>0&&<div className="v3-actions" aria-label="情境建議行動">
-     <div className="v3-actions-title">此刻可以…… <span>或自行輸入任何行動</span></div>
+     <div className="v3-actions-title">當前情境 <span>自由輸入不受建議限制</span></div>
      <div className="v3-actions-buttons">
       {suggestions.map(action=><button type="button" key={action.text}
        className={action.kind==='advance'?'v3-action-advance':''}
@@ -166,7 +171,7 @@ export default function V3(){
        {action.label}
       </button>)}
      </div>
-     <p className="v3-actions-hint">建議選項只是快捷動作；GM 仍依世界狀態判定結果。選「交給 GM 推進」不會代替洛河做重大決定。</p>
+     <p className="v3-actions-hint">僅提供此刻有依據的快捷行動；「交給 GM 推進」只推動 NPC 與世界，不替洛河做重要決定。</p>
     </div>}
     {busy&&<div className="v3-thinking" role="status"><span className="v3-thinking-icon">✦</span> GM 正在推演此刻的九州……</div>}
     <div ref={bottom}/>
