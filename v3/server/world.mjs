@@ -2,43 +2,47 @@ import {isNonNarrative,requireNarrative,visibleNarrative} from './narrative.mjs'
 import {initialScene,sceneOf,updateScene,sceneContext} from './scene-context.mjs';
 import {initialLivingWorld,elapsedMinutes,timeCost,advanceLivingWorld,maybeWriteChapter,recallChapters,worldPlanForGM} from './living-world.mjs';
 import {pendingRootResult,rootResultConfirmed} from './action-rules.mjs';
+import {WORLD_BIBLE,CANON_LOCATIONS,WORLD_BIBLE_VERSION} from './world-bible.mjs';
+import {CHARACTER_BIBLE} from './character-bible.mjs';
+import {loreForGM,npcPortraitForGM} from './lore-retrieval.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
 export const CONDITIONS=['健康','輕傷','受傷','重傷','休養'];
-export const LOCATIONS=['太虛宗山門','太虛宗主峰','棲風峰','演武場','藏經樓','內門居所','外門報到處'];
+export const LOCATIONS=CANON_LOCATIONS;
 const clone=x=>structuredClone(x);
 const shorten=(x,max=180)=>typeof x==='string'?x.trim().slice(0,max):'';
 const clamp=(n,min=-100,max=100)=>Math.min(max,Math.max(min,n));
 const relationship=()=>({favor:0,trust:0,respect:0,impression:'尚未熟識'});
-const make=(id,name,role,realm,roots,where,goal,traits,speech,plan)=>({
- id,name,role,realm,roots,where,goal,traits,speech,plan,mood:'平靜',status:'健康',
- cultivationProgress:0,relationships:{player:relationship()},memories:[],knowledge:[],privateNotes:[],
+const whereFromRoster=actor=>{
+ if(actor.id==='registrar')return '太虛宗山門';
+ if(actor.id==='guide')return '外門報到處';
+ if(actor.peak==='主峰')return '太虛宗主峰';
+ if(CANON_LOCATIONS.includes(actor.peak))return actor.peak;
+ if(actor.peak==='山門')return '太虛宗山門';
+ return actor.peak;
+};
+const rosterNpc=actor=>({
+ ...clone(actor),
+ where:whereFromRoster(actor),
+ relationships:{player:relationship()},
+ memories:[],knowledge:[],privateNotes:[],
 });
-export const NPCS=Object.freeze({
- registrar:make('registrar','韓守一','太虛宗收徒執事','聚氣後期','未記載','太虛宗山門',
-  '核對名冊，公正完成收徒測試',['公事公辦','耐心有限','重視流程'],'務實、簡短，不隨意許諾','大典值勤後返回執事處'),
- shen:make('shen','沈滄月','棲風峰峰主','元嬰後期','純風靈根','棲風峰',
-  '指導弟子並維持峰內秩序',['冷靜','嚴格','保護弟子但不縱容'],'言簡意賅，偶有冷幽默','修行、峰務與管教弟子'),
- yan:make('yan','晏清辭','棲風峰親傳大師姐','金丹初期','風金雙靈根','棲風峰',
-  '精進修行與照顧師弟妹',['自律','有責任感','守規矩'],'條理分明、態度直接','劍術修煉與峰內事務'),
- jiang:make('jiang','江離','棲風峰親傳師兄','築基後期','風水雙靈根','棲風峰',
-  '修行並協助同門',['溫和','愛開玩笑','擅長圓場'],'隨和，略帶調侃','修煉與同門支援'),
- gu:make('gu','顧長青','棲風峰親傳師兄','築基中期','未記載','棲風峰',
-  '穩步修行',['內斂','謹慎'],'不多話，重視實際行動','修煉與內門日課'),
- guide:make('guide','許秋雁','太虛宗外門接引弟子','聚氣中期','未記載','外門報到處',
-  '安排新弟子住所與日課',['細心','忙碌','喜歡清楚的問題'],'親切但辦事俐落','接待新弟子、分發日課冊'),
-});
+export const NPCS=Object.freeze(Object.fromEntries(CHARACTER_BIBLE.map(actor=>[
+ actor.id,rosterNpc(actor)
+])));
+
 export function initialV3World(id){
  return {id,mode:'v3',version:4,revision:0,minute:480,day:1,location:'太虛宗山門',
   protagonist:{name:'洛河',age:15,realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene()};
+  npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
 }
 export function validatedWorld(value){
  if(!value||value.mode!=='v3'||!Array.isArray(value.messages)||!Array.isArray(value.events)
  ||!Number.isInteger(value.minute)||!Number.isInteger(value.revision)||!value.npcs
  ||typeof value.npcs!=='object'||!value.protagonist)throw Error('世界資料損毀');
  value.version=4;
+ value.bibleVersion=Number.isInteger(value.bibleVersion)?value.bibleVersion:WORLD_BIBLE_VERSION;
  value.living??=initialLivingWorld();
  value.scene??=sceneOf(value);
  value.developerAudit??=[];
@@ -72,7 +76,8 @@ export function playerWorld(world){
 }
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
-  location:world.location,characters:clone(world.npcs),events:clone(world.events.slice(-25)),
+  location:world.location,bibleVersion:WORLD_BIBLE_VERSION,
+  worldBible:clone(WORLD_BIBLE),characters:clone(world.npcs),events:clone(world.events.slice(-25)),
   audit:clone((world.developerAudit||[]).slice(-25))};
 }
 const presentIds=world=>Object.keys(world.npcs).filter(id=>world.npcs[id].where===world.location);
@@ -103,15 +108,14 @@ export function gmContext(world,userText){
  const present=nearbyCharacters(world);
  const people=present.map(actor=>{
   const personal=(actor.memories||[]).filter(m=>!badEvents.has(m.eventId));
-  const memory=recalledMemories({...actor,memories:personal},userText,7)
-   .map(m=>'第'+m.day+'日・'+m.kind+'：'+shorten(visibleNarrative(m.text),210)).join('；');
-  const notes=actor.privateNotes.length?'【只有這個NPC及GM知道的私密備註】'+actor.privateNotes.slice(-3).join('；'):'';
-  return '【'+actor.name+'／'+actor.id+'】'+actor.role+'，境界'+actor.realm+'，'+actor.status+'、'+actor.mood+
-   '。對洛河：好感'+actor.relationships.player.favor+'，信任'+actor.relationships.player.trust+
-   '，尊重'+actor.relationships.player.respect+'。人格：'+actor.traits.join('、')+
-   '；說話風格：'+actor.speech+'；目標：'+actor.goal+
-   '。\n【'+actor.name+'的個別記憶】'+(memory||'沒有相關記憶')+'。'+notes;
+  const memory=recalledMemories({...actor,memories:personal},userText,6)
+   .map(m=>'第'+m.day+'日・'+m.kind+'：'+shorten(visibleNarrative(m.text),200)).join('；');
+  const notes=actor.privateNotes?.length?
+   '【GM私密備註（不代表其他人已知）】'+actor.privateNotes.slice(-2).join('；'):'';
+  return npcPortraitForGM(actor)+
+   '\n【只有'+actor.name+'經歷或獲知的事件】'+(memory||'沒有相關舊事')+'。'+notes;
  }).join('\n');
+
  const relevantEvents=world.events.filter(e=>e.type==='conversation'&&!badEvents.has(e.id))
   .map((e,i)=>({e,score:terms(e.text+' '+e.reply).size+
     [...terms(userText)].filter(t=>terms(e.text+' '+e.reply).has(t)).length*10+i/Math.max(world.events.length,1)}))
@@ -128,11 +132,12 @@ export function gmContext(world,userText){
   scene.slice(0,500),
   sceneContext(world,userText).slice(0,850),
   ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。不在場NPC不能憑空旁聽、瞬移或知道他人的私密知情。').slice(0,220),
-  people.slice(0,1900),
-  worldPlanForGM(world).slice(0,1050),
-  chapters.slice(0,1100),
-  ('【相關舊事】\n'+relevantEvents).slice(0,1250),
-  '【最近對話原文】\n'+recent.slice(-3000),
+  loreForGM(world,userText,2450),
+  people.slice(0,2200),
+  worldPlanForGM(world).slice(0,680),
+  chapters.slice(0,700),
+  ('【相關舊事】\n'+relevantEvents).slice(0,950),
+  '【最近對話原文】\n'+recent.slice(-2900),
   '【洛河最新輸入】'+userText,
   rootRule,
   '【GM規則】延續上個回合，不強迫完成任務。NPC各有個性與自己知道的事。玩家說「繼續」時自然推進但不代她決定。'
