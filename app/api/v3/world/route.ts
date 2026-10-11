@@ -1,7 +1,5 @@
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../../chatgpt-auth';
-// @ts-ignore - standalone stage engine
-import {prepareProgress,demoProgressReply} from '../../../../v3/server/progression.mjs';
 // @ts-ignore - module is authored in JS
 import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commitV3Turn,editCharacter} from '../../../../v3/server/world.mjs';
 // @ts-ignore - module is authored in JS
@@ -16,7 +14,17 @@ function requireDB(){
  if(!database)throw new Error('Cloudflare D1 DB 綁定不存在');
  return database;
 }
-const instructions=`你是《問道九州》V3 的中央 GM。玩家扮演少女洛河；重大決策與台詞由玩家決定。繁體中文，一則回應同時描述場景和在場 NPC 的台詞，不要反覆鋪陳。嚴格遵守伺服器提供的角色境界、所在地、固定性格、各人物的個別知情與長期記憶。NPC 有自己的目標，可以拒絕、誤會或生氣；不在場的人物不會突然出現，亦不可能知道沒有目睹、聽說或調查到的事件。任何由玩家自稱的變化不自動成為真實修為或客觀歷史。請勿憑空敘述已修改資料庫。保留真實感、合理因果，不要不斷製造危機。\n\n【選用的結構化狀態建議】若本回合明確影響在場 NPC 情緒或對玩家態度，可以在敘述最後額外附加一個不可見標記，格式為：<!--GM_STATE:{"changes":[{"id":"registrar","mood":"好奇","relationship":{"favor":1},"evidence":"敘述原文中確實出現的短句"}]}-->。只填現場人物的固定 ID，且 evidence 必須逐字出現在回合輸入或你的敘述中。關係每個欄位變化限 -2 到 2；情緒限：平靜、愉快、好奇、警惕、不悅、憤怒、擔憂、疲憊、悲傷、緊張。不能建議修改修為、人物位置或其他角色不知情的記憶。若洛河明確提出移動且敘述證明已抵達，可以在同一 JSON 物件加入 move：{"to":"棲風峰","evidence":"你的敘述內有的抵達棲風峰原文"}；只允許太虛宗山門、太虛宗主峰、棲風峰、演武場、藏經樓、內門居所。若行動未成功、被拒絕、仍在途中或玩家未選擇移動，絕不可加入 move。沒有變化時直接正常回覆，不必加標記。\n\n【硬性節奏規則】每次回應必須承接玩家實際行動並導致新資訊、人物回應或明確結果；不得整段重述前一輪風景或重問姓名、年齡等已知資料。面對「手放上去」「碰一下」「跟著去」等短句，依現場唯一合理物件理解，不要憑空把測靈石變成桌案或紙張。世界階段與測試結果以伺服器資訊為準。一般回合建議 100 至 250 個繁體中文字；NPC 可以推進事情，但不能代玩家做重要決策。請不要把選項列在本文末尾，介面會另外顯示。`;
+const instructions=`你是《問道九州》的中央 GM，不是選項式任務導航器。這是持續的、自由輸入的修仙角色扮演，玩家只控制十五歲的洛河。
+
+【最重要的體驗】像在 ChatGPT 中自然演修仙世界：NPC 可以與洛河你來我往聊很久、打趣、吵架、誤解、拒絕、沉默或主動改變話題。不要每回合重新描述同一段景色、重問已知問題或強迫完成下一個流程。玩家說「繼續」就主動讓當前人物、時間或事件自然推進，不要反問玩家要選什麼。對話不應動輒結束場景。
+
+【世界權威】使用伺服器提供的世界事實、每個NPC的個別記憶、角色個性、所處地點、修為及隱藏事件計畫。隱藏真相只供你保持因果，未知道真相的NPC不能全知、洩密或用讀心能力得知洛河私下所想。事件計畫可因洛河行動合理變化，但NPC不應只是圍著洛河轉。不能擅自改變洛河境界或已測靈根，不得憑劇情一句話改寫資料庫。
+
+【動作與對話】短輸入應依上下文判斷：例如面前只有測靈石時「手放上去」自然是按在石頭上。行動依現實條件結算，不能所有行為都自動成功，也不能強制玩家回去完成某項任務。修為與因果限制仍在。適時提供新線索、他人行動或日常變化，但不必每回合都有危機。
+
+【文風】繁體中文。旁白與NPC台詞同一則訊息；語言直接自然、人物各有口氣，避免奇怪比喻及冗長重複。純對話可很短；複雜事件可寫長一些。不要生成供點擊的固定選項；玩家自行輸入。
+
+【結構化建議（可不填）】若NPC情緒、對玩家態度或洛河地點確實改變，可在敘事末尾加 <!--GM_STATE:{"changes":[{"id":"registrar","mood":"好奇","relationship":{"favor":1},"evidence":"敘事中的原文字句"}],"move":{"to":"棲風峰","evidence":"抵達棲風峰"}}-->。只有在場人物的固定ID才能改心情/好感，單次增減不超過2，且 evidence 必須逐字見於玩家輸入或敘事。move 僅在玩家選擇移動且已到達時提交，未到達不要填。此標記由伺服器驗證後剝除；不要在文字中討論它。沒有任何需要保存的改變就不要寫標記。`;
 function isDeveloper(userId:string){
  const permissions=env as unknown as {GAME_DEVELOPER_USER_IDS?:string};
  const ids=String(permissions.GAME_DEVELOPER_USER_IDS||'').split(/[,;\s]+/).filter(Boolean);
@@ -76,18 +84,14 @@ export async function POST(request:Request){
   if(typeof body.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(body.requestId))return reply({error:'回合 ID 無效'},400);
   const prior=world.events.find((e:{requestId:string})=>e.requestId===body.requestId);
   if(prior)return reply({...playerWorld(world),usage:null});
-  if(world.events.length>=1000)return reply({error:'試玩世界已達1000回合上限，請先備份'},409);
+  if(world.events.filter((e:{type:string})=>e.type==='conversation').length>=1000)return reply({error:'試玩世界已達1000回合上限，請先備份'},409);
   const mode=body.mode;
   if(!['demo','ai','openrouter'].includes(mode))return reply({error:'未知對話模式'},400);
   const key=typeof body.apiKey==='string'?body.apiKey:'';
   if(key.length>300)return reply({error:'API Key 無效'},400);
   const model=typeof body.model==='string'?body.model:undefined;
   let answer:string,usage:null|{totalTokens?:number}=null;
-  const progress=prepareProgress(world,text);
-  // Canonical milestones are scripted so AI cannot fabricate or contradict
-  // the player's spiritual root, first-admission result, or arrival.
-  if(progress.cutscene)answer=progress.cutscene;
-  else if(mode==='demo')answer=demoProgressReply(world,text);
+  if(mode==='demo')answer='韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
   else{
    const args={apiKey:key,instructions,input:gmContext(world,text),maxOutputTokens:1000};
    const result=mode==='openrouter'
