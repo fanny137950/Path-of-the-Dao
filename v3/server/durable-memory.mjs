@@ -3,7 +3,7 @@
  * The ledger stores source excerpts, not AI-invented summaries. It distinguishes
  * what the GM can verify from what each NPC actually witnessed.
  */
-import {visibleNarrative} from './narrative.mjs';
+import {visibleNarrative,isNonNarrative} from './narrative.mjs';
 const excerpt=(s,n)=>String(s??'').trim().slice(0,n);
 const categories=[
  ['promise',/(承諾|答應|約定|說好|保證|發誓|不再|一定會)/],
@@ -26,7 +26,7 @@ const overlap=(a,b)=>{
  let result=0;for(const n of needle)if(haystack.has(n))result++;
  return result;
 };
-const validEvent=e=>e?.type==='conversation'&&typeof e.id==='string'&&typeof e.text==='string';
+const validEvent=e=>e?.type==='conversation'&&typeof e.id==='string'&&typeof e.text==='string'&&!isNonNarrative(e.reply);
 export function memoryFromEvent(e){
  if(!validEvent(e))return null;
  const narrative=visibleNarrative(e.reply||'');
