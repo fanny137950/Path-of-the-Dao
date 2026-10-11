@@ -34,7 +34,7 @@ export function progressOf(world){
  return initialProgress();
 }
 function actionIsNegated(text){
- return /(?:不要|不想|拒絕|不按|不碰|先別|別碰|沒按|尚未|不準備|收回手)/.test(text);
+ return /(?:不要|不想|拒絕|不按|不碰|不測|暫不測|先不|先別|別碰|沒按|尚未|不準備|收回手)/.test(text);
 }
 function touchesStone(text){
  if(actionIsNegated(text))return false;
