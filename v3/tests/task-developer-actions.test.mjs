@@ -16,12 +16,12 @@ test('post-test shortcuts must not repeat old result or next-step questions',()=
 test('contextual shortcuts only match current scene and must not repeat recent exact action',()=>{
  const world=initialV3World('actions-object');
  world.messages.push({role:'assistant',content:'韓守一指向測靈石：「把手按在這裡。」'});
- assert.ok(suggestedActions(world).some(s=>s.label==='將手按上測靈石'));
+ assert.ok(suggestedActions(world).some(s=>s.label==='將手放上測靈石'));
  const used='我將手掌按在測靈石上，接受測試。';
  world.messages.push({role:'user',content:used});
  assert.ok(!suggestedActions(world).some(s=>s.text===used));
  world.protagonist.spiritualRoot='純風靈根';
- assert.ok(!suggestedActions(world).some(s=>s.label==='將手按上測靈石'));
+ assert.ok(!suggestedActions(world).some(s=>s.label==='將手放上測靈石'));
 });
 
 test('selection shortcut is based on real active calendar, never future-only plan',()=>{
