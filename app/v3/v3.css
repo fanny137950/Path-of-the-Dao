@@ -23,3 +23,14 @@
 .v3-dev-audit p{margin:10px 0;line-height:1.5}
 .v3-success{color:#62c593;opacity:1!important}
 @media(max-width:600px){.v3-dev-grid{grid-template-columns:1fr}.v3-dev-actors{max-height:none;flex-direction:row;overflow-x:auto}.v3-dev-actors button{min-width:130px}.v3-dev-edit-grid{grid-template-columns:1fr}}
+
+
+/* Optional, contextual action chips beneath the last GM response */
+.v3-actions{display:flex;flex-direction:column;gap:10px;margin:-9px 8px 6px;padding:2px 6px}
+.v3-actions-title{font-size:12px;font-weight:600;color:inherit;opacity:.85;margin:0}
+.v3-actions-title span{font-weight:400;opacity:.65;margin-left:8px}
+.v3-actions-buttons{display:flex;flex-wrap:wrap;gap:9px}
+.v3-shell .v3-actions-buttons button{padding:9px 13px;border:1px solid #7e94b261;border-radius:14px;font-size:13px;line-height:1.4;background:#8395b012;transition:background .15s,border-color .15s;text-align:left}
+.v3-shell .v3-actions-buttons button:hover,.v3-shell .v3-actions-buttons button:focus-visible{background:#8395b030;border-color:#91aec0;outline-offset:3px}
+.v3-actions-buttons button span{opacity:.55;margin-left:5px}
+@media(max-width:600px){.v3-actions{margin:0}.v3-actions-buttons{gap:7px}.v3-shell .v3-actions-buttons button{font-size:12px;padding:8px 10px}}
