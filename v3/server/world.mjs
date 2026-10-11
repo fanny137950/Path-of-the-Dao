@@ -171,7 +171,7 @@ export function gmContext(world,userText){
   sceneConversationForGM(world,userText,5700),
   '【洛河最新輸入】'+userText,
   rootRule,
-  '【回應原則】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
+  '【GM主動性與回應原則】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
  ].filter(Boolean);
  const optional=[
   people.slice(0,1500),
