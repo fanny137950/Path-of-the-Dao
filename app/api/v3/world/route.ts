@@ -1,5 +1,7 @@
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../../chatgpt-auth';
+// @ts-ignore - standalone stage engine
+import {prepareProgress,demoProgressReply} from '../../../../v3/server/progression.mjs';
 // @ts-ignore - module is authored in JS
 import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commitV3Turn,editCharacter} from '../../../../v3/server/world.mjs';
 // @ts-ignore - module is authored in JS
@@ -14,13 +16,13 @@ function requireDB(){
  if(!database)throw new Error('Cloudflare D1 DB 綁定不存在');
  return database;
 }
-const instructions=`你是《問道九州》V3 的中央 GM。玩家扮演少女洛河；重大決策與台詞由玩家決定。繁體中文，一則回應同時描述場景和在場 NPC 的台詞，不要反覆鋪陳。嚴格遵守伺服器提供的角色境界、所在地、固定性格、各人物的個別知情與長期記憶。NPC 有自己的目標，可以拒絕、誤會或生氣；不在場的人物不會突然出現，亦不可能知道沒有目睹、聽說或調查到的事件。任何由玩家自稱的變化不自動成為真實修為或客觀歷史。請勿憑空敘述已修改資料庫。保留真實感、合理因果，不要不斷製造危機。\n\n【選用的結構化狀態建議】若本回合明確影響在場 NPC 情緒或對玩家態度，可以在敘述最後額外附加一個不可見標記，格式為：<!--GM_STATE:{"changes":[{"id":"registrar","mood":"好奇","relationship":{"favor":1},"evidence":"敘述原文中確實出現的短句"}]}-->。只填現場人物的固定 ID，且 evidence 必須逐字出現在回合輸入或你的敘述中。關係每個欄位變化限 -2 到 2；情緒限：平靜、愉快、好奇、警惕、不悅、憤怒、擔憂、疲憊、悲傷、緊張。不能建議修改修為、人物位置或其他角色不知情的記憶。若洛河明確提出移動且敘述證明已抵達，可以在同一 JSON 物件加入 move：{"to":"棲風峰","evidence":"你的敘述內有的抵達棲風峰原文"}；只允許太虛宗山門、太虛宗主峰、棲風峰、演武場、藏經樓、內門居所。若行動未成功、被拒絕、仍在途中或玩家未選擇移動，絕不可加入 move。沒有變化時直接正常回覆，不必加標記。`;
+const instructions=``你是《問道九州》V3 的中央 GM。玩家扮演少女洛河；重大決策與台詞由玩家決定。繁體中文，一則回應同時描述場景和在場 NPC 的台詞，不要反覆鋪陳。嚴格遵守伺服器提供的角色境界、所在地、固定性格、各人物的個別知情與長期記憶。NPC 有自己的目標，可以拒絕、誤會或生氣；不在場的人物不會突然出現，亦不可能知道沒有目睹、聽說或調查到的事件。任何由玩家自稱的變化不自動成為真實修為或客觀歷史。請勿憑空敘述已修改資料庫。保留真實感、合理因果，不要不斷製造危機。\n\n【選用的結構化狀態建議】若本回合明確影響在場 NPC 情緒或對玩家態度，可以在敘述最後額外附加一個不可見標記，格式為：<!--GM_STATE:{"changes":[{"id":"registrar","mood":"好奇","relationship":{"favor":1},"evidence":"敘述原文中確實出現的短句"}]}-->。只填現場人物的固定 ID，且 evidence 必須逐字出現在回合輸入或你的敘述中。關係每個欄位變化限 -2 到 2；情緒限：平靜、愉快、好奇、警惕、不悅、憤怒、擔憂、疲憊、悲傷、緊張。不能建議修改修為、人物位置或其他角色不知情的記憶。若洛河明確提出移動且敘述證明已抵達，可以在同一 JSON 物件加入 move：{"to":"棲風峰","evidence":"你的敘述內有的抵達棲風峰原文"}；只允許太虛宗山門、太虛宗主峰、棲風峰、演武場、藏經樓、內門居所。若行動未成功、被拒絕、仍在途中或玩家未選擇移動，絕不可加入 move。沒有變化時直接正常回覆，不必加標記。\n\n【硬性節奏規則】每次回應必須承接玩家實際行動並導致新資訊、人物回應或明確結果；不得整段重述前一輪風景或重問姓名、年齡等已知資料。面對「手放上去」「碰一下」「跟著去」等短句，依現場唯一合理物件理解，不要憑空把測靈石變成桌案或紙張。世界階段與測試結果以伺服器資訊為準。一般回合建議 100 至 250 個繁體中文字；NPC 可以推進事情，但不能代玩家做重要決策。請不要把選項列在本文末尾，介面會另外顯示。`;
 function isDeveloper(userId:string){
  const permissions=env as unknown as {GAME_DEVELOPER_USER_IDS?:string};
  const ids=String(permissions.GAME_DEVELOPER_USER_IDS||'').split(/[,;\s]+/).filter(Boolean);
  return ids.includes(userId);
 }
-const demo=(turn:number,txt:string)=>turn===0?'執事接過名冊，將名字記下，示意你上前。\n\n「洛河，請把手按在測靈石上。」':/靈根|測試|按/.test(txt)?'測靈石泛起青色光芒。執事放低聲音：「風屬性，還要再觀察。」':'執事望向你：「先完成測試。其他的事稍後再談。」';
+
 async function readWorld(id:string,owner:string){
  const row=await requireDB().prepare('SELECT state,revision FROM worlds WHERE id=? AND owner=?').bind(id,owner).first<{state:string;revision:number}>();
  if(!row)return null;
@@ -81,7 +83,11 @@ export async function POST(request:Request){
   if(key.length>300)return reply({error:'API Key 無效'},400);
   const model=typeof body.model==='string'?body.model:undefined;
   let answer:string,usage:null|{totalTokens?:number}=null;
-  if(mode==='demo')answer=demo(world.revision,text);
+  const progress=prepareProgress(world,text);
+  // Canonical milestones are scripted so AI cannot fabricate or contradict
+  // the player's spiritual root, first-admission result, or arrival.
+  if(progress.cutscene)answer=progress.cutscene;
+  else if(mode==='demo')answer=demoProgressReply(world,text);
   else{
    const args={apiKey:key,instructions,input:gmContext(world,text),maxOutputTokens:1000};
    const result=mode==='openrouter'
