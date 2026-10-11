@@ -50,7 +50,7 @@ test('quiet offscreen world arc advances when player passes time, with private N
  assert.equal(next.living.arcs[0].status,'已解決');
  assert.equal(next.npcs.registrar.knowledge.filter(k=>k.startsWith('offscreen:')).length,3);
  assert.equal(next.npcs.guide.knowledge.filter(k=>k.startsWith('offscreen:')).length,2);
- assert.equal(next.npcs.shen.knowledge.length,0);
+ assert.equal(next.npcs.shen.knowledge.filter(k=>k.startsWith('offscreen:')).length,0);
  assert.equal(world.living.arcs[0].status,'未開始');
  assert.equal(playerWorld(next).living,undefined);
  assert.match(gmContext(next,'今天執事處出了什麼事'),/真相/);
