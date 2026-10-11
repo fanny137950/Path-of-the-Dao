@@ -217,9 +217,14 @@ function applyChanges(next,changes,text,narration,present){
   const actor=next.npcs[change.id],quote=shorten(change.evidence,100);
   if(!actor||quote.length<2||!evidenceText.includes(quote))continue;
   if(MOODS.includes(change.mood))actor.mood=change.mood;
-  if(CONDITIONS.includes(change.status))actor.status=change.status;
+  // A generic emotional description cannot justify injury, recovery or
+  // a complete new life goal. Require actor-specific evidence for both.
+  if(CONDITIONS.includes(change.status)&&quote.includes(actor.name)&&
+    /(受傷|負傷|擦傷|扭傷|流血|傷口|傷勢|痊癒|恢復|康復|輕傷|重傷|健康)/.test(quote))
+   actor.status=change.status;
   if(typeof change.goal==='string'&&change.goal.trim()&&change.goal.length<=180&&
-     actor.goal!==change.goal.trim())actor.goal=change.goal.trim();
+     quote.includes(actor.name)&&/(決定|打算|計畫|想要|改為|準備|要去|承諾|誓言)/.test(quote))
+   actor.goal=change.goal.trim();
   if(change.relationship&&typeof change.relationship==='object'){
    for(const field of ['favor','trust','respect']){
     const delta=change.relationship[field];
