@@ -67,6 +67,13 @@ export function ensureEventCalendar(world){
  if(!world.eventCalendar||!Array.isArray(world.eventCalendar.events)){
   // Existing saves preserve their game-time: no replay of a past festival.
   world.eventCalendar=initialEventCalendar();
+  const now=(world.day-1)*DAY+world.minute;
+  // Migration: an old save may already be days past recruitment. Mark elapsed
+  // phases as historical, without retroactively leaking events or NPC knowledge.
+  for(const event of world.eventCalendar.events){
+   event.completed=event.stages.filter(stage=>stage.at<=now).map(stage=>stage.id);
+   event.state=now>=event.end?'completed':now>=event.start?'active':'scheduled';
+  }
  }
  return world.eventCalendar;
 }
