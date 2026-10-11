@@ -1,6 +1,8 @@
 import {getChatGPTUser} from '../../../chatgpt-auth';
 // @ts-ignore — the server-only adapter is implemented in a plain .mjs module.
 import {generateGMResponse} from '../../../../v3/server/openai.mjs';
+// @ts-ignore — server-only plain JS adapter
+import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
 export const dynamic='force-dynamic';
 const instructions=`你是《問道九州》V3 的中央 GM。玩家扮演十五歲少女洛河，剛抵達太虛宗參加入門測試。保留修仙世界觀：太虛宗、棲風峰、沈滄月（冷靜嚴格的峰主）、晏清辭（嚴謹師姐）、江離（溫和愛鬧師兄）、顧長青。不得擅自代玩家做重大決定。以繁體中文輸出一段連續、自然、節奏俐落的場景，NPC 台詞與動作可放在同一則回覆。NPC 不全知，不為討好玩家而破壞修為差距。避免每回合都製造危機。此為無持久世界模擬的早期試玩版，不要聲稱你已更新資料庫。依照對話歷史維持一致性。`;
 const demo=(text:string,turn:number)=>{
@@ -24,16 +26,18 @@ const demo=(text:string,turn:number)=>{
 export async function POST(request:Request){
  try{
   const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin)return Response.json({error:'拒絕跨來源請求'},{status:403});
-  const user=await getChatGPTUser();if(!user)return Response.json({error:'請先透過 Sites 登入以試玩'},{status:401});
+  const user=await getChatGPTUser();if(!user)return Response.json({error:'請先登入以試玩'},{status:401});
   const raw=await request.text();if(raw.length>16000)return Response.json({error:'請求過長'},{status:413});
   const body=JSON.parse(raw);const messages=body.messages;
   if(!Array.isArray(messages)||messages.length<1||messages.length>20||messages.some((m:any)=>!['user','assistant'].includes(m?.role)||typeof m?.content!=='string'||m.content.length>2500))return Response.json({error:'無效對話紀錄'},{status:400});
   const latest=messages.at(-1);if(latest.role!=='user'||!latest.content.trim())return Response.json({error:'缺少玩家輸入'},{status:400});
   if(body.mode==='demo')return Response.json({text:demo(latest.content,Number(body.turn)||0)});
-  if(body.mode!=='ai')return Response.json({error:'未知模式'},{status:400});
+  if(body.mode!=='ai'&&body.mode!=='openrouter')return Response.json({error:'未知模式'},{status:400});
   const apiKey=typeof body.apiKey==='string'?body.apiKey:'';if(apiKey.length>300)return Response.json({error:'無效金鑰'},{status:400});
   const transcript=messages.map((m:any)=>`${m.role==='user'?'洛河':'GM'}：${m.content}`).join('\n\n');
-  const result=await generateGMResponse({apiKey,model:body.model||'gpt-4.1-mini',instructions,input:transcript,maxOutputTokens:1000});
+  const result=body.mode==='openrouter'
+   ?await generateOpenRouterResponse({apiKey,model:body.model||'openrouter/free',instructions,input:transcript,maxOutputTokens:1000})
+   :await generateGMResponse({apiKey,model:body.model||'gpt-4.1-mini',instructions,input:transcript,maxOutputTokens:1000});
   return Response.json(result,{headers:{'Cache-Control':'no-store'}});
  }catch(e){return Response.json({error:e instanceof Error?e.message:'伺服器錯誤'},{status:e&&typeof e==='object'&&'status' in e&&typeof e.status==='number'?e.status:500,headers:{'Cache-Control':'no-store'}})}
 }
