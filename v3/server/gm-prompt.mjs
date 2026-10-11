@@ -7,7 +7,7 @@ export function currentTurnDirective(world,text,{sceneJump=false,isTimeAdvance=f
  if(sceneJump)type='幕外節奏指令：不是洛河口頭台詞';
  else if(isTimeAdvance)type='等待與時間推進';
  else if(/^(?:繼續|继续|接著|接下來|往下|然後呢)[！？?!。\s]*$/.test(s))type='GM 主動續演';
- else if(/(?:打|揍|踢|踹|攻擊|砸|推開|拔劍|刺|砍|抓住|撿起|拿起|伸手|走向|前往|衝向|冲向|放上|跳下|閃避|闪避|躲開)/.test(s)&&
+ else if(!/^(?:你|妳|他|她|我)[^。！？!?]{0,15}(?:欠打|想打|能打|敢打)/.test(s)&&/(?:打|揍|踢|踹|攻擊|砸|推開|拔劍|刺|砍|抓住|撿起|拿起|伸手|走向|前往|衝向|冲向|放上|跳下|閃避|闪避|躲開)/.test(s)&&
   !/^(?:你|妳|你們|他|她)(?:敢不敢|要不要|想不想|是不是|會不會)/.test(s))type='已指定立即執行的動作：本回合判定結果，不可只反問';
  else if(/(?:心想|心裡|心中|暗想|思索)/.test(s))type='洛河的私下思考，不可讓旁人自動知情';
  return '【本回合執行焦點（權威）】'+type+'。當前第'+world.day+'日 '+String(Math.floor(world.minute/60)).padStart(2,'0')+':'+String(world.minute%60).padStart(2,'0')+
