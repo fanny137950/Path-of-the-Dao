@@ -5,12 +5,18 @@ type Memory={id:string;eventId:string;kind:string;day:number;minute:number;text:
 type Character={
  id:string;name:string;role:string;realm:string;roots:string;where:string;goal:string;
  traits:string[];speech:string;plan:string;mood:string;status:string;cultivationProgress:number;
+ peak?:string;source?:string;age?:number|null;personality?:string;flaw?:string;
+ methods?:string[];ties?:string[];background?:string;privateLore?:string;
+ aptitude?:{grade:string;description:string;bottleneck:string;growth:string;assessed:boolean};
+ fieldSources?:Record<string,string>;
  relationships:{player:{favor:number;trust:number;respect:number;impression?:string}};
  memories:Memory[];privateNotes:string[];knowledge:string[];
 };
 type DeveloperData={
  revision:number;world:string;day:number;minute:number;location:string;
- characters:Record<string,Character>;
+ characters:Record<string,Character>;bibleVersion?:number;
+ worldBible?:{title:string;sect?:{recruitment:{steps:string[]};peaks:{name:string;domain:string;leader:string;source:string}[]};
+  cultivation?:{realmOrder:string[];hardRules:string[]};factions?:{name:string;region:string;stance:string}[]};
  events:{id?:string;text:string;reply:string;witnesses?:string[]}[];
  audit:{revision:number;actorId:string;fields:string[];by:string;note?:string}[];
 };
@@ -83,7 +89,7 @@ export default function V3DeveloperPanel({
   {notice&&<p className="v3-success">{notice}</p>}
   {data&&<div className="v3-dev-grid">
    <aside className="v3-dev-actors">
-    <p>第 {data.day} 日 · 回合／版本 {data.revision}</p>
+    <p>第 {data.day} 日 · 共 {Object.keys(data.characters).length} 位人物 · 回合 {data.revision}</p>
     {Object.values(data.characters).map(c=><button key={c.id} className={selected===c.id?'v3-dev-active':''} onClick={()=>setSelected(c.id)}>
      <strong>{c.name}</strong><small>{c.realm} · {c.mood}</small>
     </button>)}
@@ -91,7 +97,23 @@ export default function V3DeveloperPanel({
    <div className="v3-dev-details">
     {!actor||!draft?<p>請選擇人物。</p>:<>
      <h4>{actor.name} <span className="v3-dev-muted">#{actor.id}</span></h4>
-     <p><strong>人物核心資料與日常狀態</strong> — 人格與修為的修改僅供開發者使用，AI 無權直接改寫。</p>
+     <p><strong>人物核心資料與日常狀態</strong> — 資質、境界、靈根及人格分開記錄；新增設定附有來源標註。下方可編輯的欄位不會重寫人物聖經。</p>
+     <details className="v3-dev-dossier" open>
+      <summary>人物設定與修煉資質</summary>
+      <p><strong>所屬：</strong>{actor.peak||'未明'} · <strong>資質：</strong>{actor.aptitude?.grade||'未知'} · <strong>年齡：</strong>{actor.age??'未公開'}</p>
+      <p><strong>資質評估：</strong>{actor.aptitude?.description||'暫無評估'}</p>
+      <p><strong>修行瓶頸：</strong>{actor.aptitude?.bottleneck||'未詳'} · <strong>成長方式：</strong>{actor.aptitude?.growth||'未詳'}</p>
+      <p><strong>人物核心：</strong>{actor.personality||actor.traits.join('、')}</p>
+      <p><strong>性格弱點：</strong>{actor.flaw||'尚未定義'}</p>
+      <p><strong>戰鬥／專長：</strong>{actor.methods?.join('、')||'未詳'}</p>
+      <p><strong>過往與背景：</strong>{actor.background||'未詳'}</p>
+      <p><strong>人際關係：</strong>{actor.ties?.join('；')||'尚未記錄'}</p>
+      <p><strong>GM 才知道的角色內在：</strong>{actor.privateLore||'尚無'}</p>
+      <p><strong>人物原型：</strong>{actor.source==='expanded'?'本次新增':'沿用過去太虛宗世界線'}；
+       <strong>境界來源：</strong>{actor.fieldSources?.realm==='expanded'?'新增補充':'既定設定'}；
+       <strong>靈根來源：</strong>{actor.fieldSources?.roots==='established'?'既定設定':actor.fieldSources?.roots==='unknown'?'尚未公開':'新設定'}；
+       <strong>資質來源：</strong>新增推定，非現階段公開測定</p>
+     </details>
      <div className="v3-dev-edit-grid">
       <label>身分／職責<input value={draft.role} maxLength={80} onChange={e=>change('role',e.target.value)}/></label>
       <label>境界<input value={draft.realm} maxLength={40} onChange={e=>change('realm',e.target.value)}/></label>
@@ -125,6 +147,14 @@ export default function V3DeveloperPanel({
     </>}
    </div>
   </div>}
+  {data?.worldBible&&<details className="v3-dev-audit v3-dev-dossier">
+    <summary>九州世界聖經 · {data.worldBible.title} · 第 {data.bibleVersion??1} 版</summary>
+    <p><strong>修煉境界：</strong>{data.worldBible.cultivation?.realmOrder.join(' → ')}</p>
+    <p><strong>太虛宗十二峰：</strong></p>
+    {data.worldBible.sect?.peaks.map(p=><p key={p.name}>{p.name} · {p.domain} · 主事：{p.leader} {p.source==='expanded'?'（新增）':''}</p>)}
+    <p><strong>收徒規則：</strong>{data.worldBible.sect?.recruitment.steps.join(' → ')}</p>
+    <p><strong>九州勢力：</strong>{data.worldBible.factions?.map(f=>f.name+'／'+f.region).join('、')}</p>
+   </details>}
   {data&&<details className="v3-dev-audit"><summary>世界事件與修改紀錄</summary>
    {data.events.slice(-10).reverse().map((e,i)=><p key={e.id||i}>事件 {e.id||i} · {e.witnesses?.join('、')||'無已確認旁聽者'}：{e.text}</p>)}
    {data.audit.slice(-10).reverse().map((e,i)=><p key={i}>版本 {e.revision} · {e.actorId} · 修改 {e.fields.join('、')}</p>)}
