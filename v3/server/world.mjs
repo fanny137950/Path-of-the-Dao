@@ -1,3 +1,4 @@
+import {isNonNarrative,requireNarrative} from './narrative.mjs';
 import {initialProgress,progressOf,prepareProgress,applyPreparedProgress,suggestedActions,progressFacts} from './progression.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗收徒大典。十五歲的洛河穿過山門，來到測試臺前。\n\n韓守一核對玉簡：「洛河，十五歲，名冊上有你。」\n\n他指向桌邊一塊泛著微光的測靈石：「手掌按上去便可測靈根。不急，也可以先問我測試規矩。」\n\n後面的隊伍正緩緩向前移動。';
@@ -57,7 +58,11 @@ export function validatedWorld(value){
 }
 export function playerWorld(world){
  return {id:world.id,revision:world.revision,day:world.day,minute:world.minute,
- location:world.location,protagonist:world.protagonist,messages:world.messages,
+ location:world.location,protagonist:world.protagonist,
+  // Keep old D1 event history untouched, but do not render legacy classifier
+  // outputs as if they were a character's dialogue.
+  messages:world.messages.map(m=>m.role==='assistant'&&isNonNarrative(m.content)
+   ?{...m,content:'（先前免費模型的回應無效，已排除在遊戲劇情之外。）'}:m),
   phase:progressOf(world).phase,choices:suggestedActions(world)};
 }
 export function developerWorld(world){
@@ -86,10 +91,13 @@ export function recalledMemories(actor,query,limit=8){
  })).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.m);
 }
 export function gmContext(world,userText){
- const recent=world.messages.slice(-20).map(m=>(m.role==='user'?'洛河':'GM')+'：'+m.content).join('\n\n');
+ const badEvents=new Set(world.events.filter(e=>isNonNarrative(e.reply)).map(e=>e.id));
+ const recent=world.messages.slice(-20)
+  .filter(m=>m.role!=='assistant'||!isNonNarrative(m.content))
+  .map(m=>(m.role==='user'?'洛河':'GM')+'：'+m.content).join('\n\n');
  const present=nearbyCharacters(world);
  const people=present.map(actor=>{
-  const memory=recalledMemories(actor,userText,10).map(m=>'第'+m.day+'日・'+m.kind+'：'+m.text).join('；');
+  const memory=recalledMemories({...actor,memories:(actor.memories||[]).filter(m=>!badEvents.has(m.eventId))},userText,10).map(m=>'第'+m.day+'日・'+m.kind+'：'+m.text).join('；');
   const notes=actor.privateNotes.length?'【GM 私密備註（其他人物未知）】'+actor.privateNotes.slice(-3).join('；'):'';
   return '【'+actor.name+'／'+actor.id+'】'+actor.role+'，境界'+actor.realm+'，'+actor.status+'、'+actor.mood+
    '。對洛河：好感'+actor.relationships.player.favor+'，信任'+actor.relationships.player.trust+
@@ -101,7 +109,7 @@ export function gmContext(world,userText){
   world.protagonist.age+'歲，境界'+world.protagonist.realm+'，靈根'+world.protagonist.spiritualRoot+
   '。\n【現場人物】'+(present.map(x=>x.name).join('、')||'沒有已登記人物')+
   '；不在場人物不能憑空旁聽、瞬間出現。\n'+people+
-  '\n【過去已紀錄的事件】'+world.events.slice(-6).map(e=>'第'+e.day+'日：'+shorten(e.text,90)).join('；')+
+  '\n【過去已紀錄的事件】'+world.events.filter(e=>!badEvents.has(e.id)).slice(-6).map(e=>'第'+e.day+'日：'+shorten(e.text,90)).join('；')+
   '\n【最近對話】\n'+recent+'\n【洛河最新行動】'+userText+
   '\n【知情規則】每人只能使用自身知道的線索。不得把一人秘密變成其他人的知識。AI 敘述不等同正式修改資料庫修為、位置、物品。\n'+progressFacts(world,userText);
 }
@@ -136,6 +144,7 @@ function applyChanges(next,changes,text,narration,present){
 export function commitV3Turn(world,userText,rawAnswer,requestId){
  if(typeof userText!=='string'||!userText.trim()||userText.length>2500)throw Error('玩家輸入無效');
  if(typeof rawAnswer!=='string'||!rawAnswer.trim()||rawAnswer.length>12000)throw Error('GM 回覆無效');
+ requireNarrative(rawAnswer);
  if(world.events.some(e=>e.requestId===requestId))throw Error('重複回合');
  if(world.events.length>=1000)throw Error('試玩世界已達1000回合，請先備份');
  const present=new Set(presentIds(world)),parsed=parseGMResult(rawAnswer),next=clone(world);
