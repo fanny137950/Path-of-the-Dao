@@ -150,18 +150,26 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
 export function editCharacter(world,id,patch,note,by='developer'){
  if(typeof id!=='string'||!Object.hasOwn(world.npcs,id))throw Error('找不到人物');
  if(!patch||typeof patch!=='object'||Array.isArray(patch))throw Error('無效人物設定');
- const allowed=['mood','status','where','goal','cultivationProgress','relationship','privateNote'];
+ const allowed=['mood','status','where','goal','cultivationProgress','relationship','privateNote','role','realm','roots','traits','speech','plan'];
  if(Object.keys(patch).some(k=>!allowed.includes(k)))throw Error('不允許的設定欄位');
  if(Object.keys(patch).length===0)throw Error('沒有修改');
  const next=clone(world),actor=next.npcs[id];
  if(patch.mood!==undefined){if(!MOODS.includes(patch.mood))throw Error('無效情緒');actor.mood=patch.mood;}
  if(patch.status!==undefined){if(!CONDITIONS.includes(patch.status))throw Error('無效身體狀況');actor.status=patch.status;}
- for(const field of ['where','goal']){
+ for(const field of ['where','goal','role','roots','speech','plan']){
   if(patch[field]!==undefined){
-   const value=patch[field],max=field==='where'?70:180;
+   const value=patch[field],max=field==='where'?70:field==='roots'?50:field==='role'?80:180;
    if(typeof value!=='string'||!value.trim()||value.length>max)throw Error('無效'+field);
    actor[field]=value.trim();
   }
+ }
+ if(patch.realm!==undefined){
+  if(typeof patch.realm!=='string'||!(/^(凡人|鍛體|聚氣|築基|金丹|元嬰|化神|洞虛|合道|渡劫)(初期|中期|後期|圓滿)?$/).test(patch.realm))throw Error('無效修為境界');
+  actor.realm=patch.realm;
+ }
+ if(patch.traits!==undefined){
+  if(!Array.isArray(patch.traits)||patch.traits.length<1||patch.traits.length>12||patch.traits.some(x=>typeof x!=='string'||!x.trim()||x.length>24))throw Error('人格特質需為1至12項');
+  actor.traits=patch.traits.map(x=>x.trim());
  }
  if(patch.cultivationProgress!==undefined){
   const n=patch.cultivationProgress;
