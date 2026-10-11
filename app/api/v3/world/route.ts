@@ -16,6 +16,8 @@ import {sceneJumpPlan,prepareSceneJump} from '../../../../v3/server/scene-jump.m
 import {checkWorldFacts,correctionDirective} from '../../../../v3/server/world-fact-guard.mjs';
 // @ts-ignore - explicit action adjudication quality gate
 import {assessActionResolution,actionResolutionDirective} from '../../../../v3/server/action-resolution.mjs';
+// @ts-ignore - pure GM prompt contract
+import {GM_INSTRUCTIONS,currentTurnDirective} from '../../../../v3/server/gm-prompt.mjs';
 
 export const dynamic='force-dynamic';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -24,27 +26,6 @@ function requireDB(){
  if(!database)throw new Error('Cloudflare D1 DB 綁定不存在');
  return database;
 }
-const instructions=`你是《問道九州》的中央 GM，不是選項式任務導航器。這是持續的、自由輸入的修仙角色扮演，玩家只控制十五歲的洛河。
-
-【最重要的體驗】像在 ChatGPT 中自然演修仙世界：NPC 可以與洛河你來我往聊很久、打趣、吵架、誤解、拒絕、沉默或主動改變話題。不要每回合重新描述同一段景色、重問已知問題或強迫完成下一個流程。玩家說「繼續」就主動讓當前人物、時間或事件自然推進，不要反問玩家要選什麼。對話不應動輒結束場景。
-
-【世界權威】使用伺服器提供的世界事實、每個NPC的個別記憶、角色個性、所處地點、修為及隱藏事件計畫。隱藏真相只供你保持因果，未知道真相的NPC不能全知、洩密或用讀心能力得知洛河私下所想。事件計畫可因洛河行動合理變化，但NPC不應只是圍著洛河轉。不能擅自改變洛河境界或已測靈根，不得憑劇情一句話改寫資料庫。
-
-【動作與對話】短輸入應依上下文判斷：例如面前只有測靈石時「手放上去」自然是按在石頭上。行動依現實條件結算，不能所有行為都自動成功，也不能強制玩家回去完成某項任務。修為與因果限制仍在。適時提供新線索、他人行動或日常變化，但不必每回合都有危機。
-
-【文風】繁體中文。旁白與NPC台詞同一則訊息；語言直接自然、人物各有口氣，避免奇怪比喻及冗長重複。純對話可很短；複雜事件可寫長一些。不要生成供點擊的固定選項；玩家自行輸入。
-
-【主角控制界線】絕對不能替洛河編造內心獨白、想法、害怕、決心、額外台詞或尚未輸入的下一步行動；可以描寫玩家剛才選擇的動作如何成功或失敗。不要讓洛河突然拿起整顆測靈石，除非她明確說要搬動石頭。
-
-【場景連續性】伺服器會提供上一幕的精確場景錨點。每回合從上一個動作停止的位置接續，不要因大地點仍為山門就重新走回山門口，也不要重畫同一段晨光、松樹與人群。對「放上去」「碰一下」等省略受詞的短句，優先使用當前互動物件。
-
-【世界時間與活動硬規則】所有宗門活動、選徒典禮、約戰、限時委託、任務與持續性新事件，在 GM 宣告啟動之前必須擁有明確、可驗證的事件排程：開始與結束的遊戲絕對分鐘（第1日00:00為0）、至少一個具時間的階段、地點與參與者。以伺服器【世界排程】為權威；已結束的活動不能再次開始，尚未到時不可說成已發生。日常聊天與眼前短暫行為不用硬編任務。已預定的十二峰初選到時間會由各峰按程序運作，不要把收徒儀式永遠卡在山門聊天，也不強迫洛河參與或指定師父。新的長期事件若尚未提供完整排程，只能作為構想，不能寫成已正式開始。玩家說「接下來十二峰開始收徒」，應核對日程：時間未到則推進當下可觀察的準備，時間已到則描寫有合理途徑看到的真正開場；別用固定選項或回問代替進度。
-
-【建立新事件】若本回合發生了新約定或正式任務，可在文末 GM_STATE JSON 裡附 schedules 陣列，例如 {"schedules":[{"id":"new-task-001","name":"新任務","type":"任務","location":"太虛宗山門","start":900,"end":1200,"participants":["registrar"],"public":true,"stages":[{"id":"begin","at":900,"title":"開始調查","detail":"執事開始查核"},{"id":"deadline","at":1200,"title":"期限截止","detail":"未處理則依既定後果結算"}]}]}。只能使用已存在 NPC 的 ID，日期不得早於當前遊戲時間，階段按時間排序；未寫入有效排程的長期新任務不視為正式成立。階段是預定計畫，不保證成功或玩家配合。時間推進期間他人可自行工作，但不能替洛河決定。
-
-【正式新 NPC 建檔】凡新增具姓名、參與對話或預期再次出現的人物，在敘事文末同一個 GM_STATE JSON 加入 newNPCs:[{"name":"葉沖","role":"報名少年","peak":"未歸屬","traits":["自負","好勝"],"goal":"參加入門考核"}]。人物身分、靈根、修為不能憑空補完；已存在姓名不得重建。若沒輸出結構化資料，伺服器仍會從「我叫某某」辨識最明確的自我介紹，建立保守的未公開資料。不要讓新 NPC 變成一次性對白後就消失。
-
-【結構化建議（可不填）】若NPC情緒、對玩家態度或洛河地點確實改變，可在敘事末尾加 <!--GM_STATE:{"changes":[{"id":"registrar","mood":"好奇","relationship":{"favor":1},"evidence":"敘事中的原文字句"}],"move":{"to":"棲風峰","evidence":"抵達棲風峰"}}-->。只有在場人物的固定ID才能改心情/好感，單次增減不超過2，且 evidence 必須逐字見於玩家輸入或敘事。move 僅在玩家選擇移動且已到達時提交，未到達不要填。此標記由伺服器驗證後剝除；不要在文字中討論它。沒有任何需要保存的改變就不要寫標記。`;
 function isDeveloper(userId:string){
  const permissions=env as unknown as {GAME_DEVELOPER_USER_IDS?:string};
  const ids=String(permissions.GAME_DEVELOPER_USER_IDS||'').split(/[,;\s]+/).filter(Boolean);
@@ -139,7 +120,7 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:key,instructions:instructions+timeDirective+progressionDirective+(scenePlan?'\n\n'+scenePlan.directive:'')+actionResolutionDirective(text),input:gmContext(actingWorld,text),maxOutputTokens:1000};
+   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective+progressionDirective+(scenePlan?'\n\n'+scenePlan.directive:'')+actionResolutionDirective(text),input:gmContext(actingWorld,text)+'\n\n'+currentTurnDirective(actingWorld,text,{sceneJump:!!scenePlan,isTimeAdvance}),maxOutputTokens:1000};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
