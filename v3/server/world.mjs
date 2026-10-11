@@ -5,6 +5,7 @@ import {pendingRootResult,rootResultConfirmed} from './action-rules.mjs';
 import {WORLD_BIBLE,CANON_LOCATIONS,WORLD_BIBLE_VERSION} from './world-bible.mjs';
 import {CHARACTER_BIBLE} from './character-bible.mjs';
 import {loreForGM,npcPortraitForGM} from './lore-retrieval.mjs';
+import {suggestedActions} from './action-suggestions.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -79,7 +80,7 @@ export function playerWorld(world){
    ?{...m,content:isNonNarrative(m.content)
       ?'（先前免費模型的回應無效，已排除在遊戲劇情之外。）'
       :visibleNarrative(m.content)}:m),
-  phase:'freeform',choices:[]};
+  phase:'freeform',choices:[],suggestions:suggestedActions(world)};
 }
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
@@ -148,7 +149,8 @@ export function gmContext(world,userText){
   '【最近對話原文】\n'+recent.slice(-2900),
   '【洛河最新輸入】'+userText,
   rootRule,
-  '【GM規則】延續上個回合，不強迫完成任務。NPC各有個性與自己知道的事。玩家說「繼續」時自然推進但不代她決定。'
+  '【GM主動性】GM 必須管理NPC主動性，而非每回合只等洛河發令。讓NPC按照工作、立場、性格與眼前事件自行說話、互動、離場或引入新人物；並可表現真正在進行的宗門日常、已發生且角色有途徑知曉的世界事件。一般對話保持自然，避免每回合塞危機。玩家只說「繼續」時，應當至少讓眼前NPC採取一個有意義的新行動／說一句帶有新資訊的話，或讓可觀察的事件、時間與人物互動有所進展；不可只重複場景和詢問玩家要做什麼。若目前需要洛河親自決定是否觸碰、戰鬥、拜師等，GM 可以推進NPC的反應、催促或環境，但不能代洛河執行該決定。選項只是可選的輸入捷徑，不限制玩家自由行動。'
+
  ];
  // Explicit per-section budgets keep the current player input and latest replies
  // even in very long games; dropping the END of a long prompt would lose them.
