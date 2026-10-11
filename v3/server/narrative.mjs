@@ -21,6 +21,10 @@ export function isNonNarrative(raw){
  return false;
 }
 export function requireNarrative(raw){
- if(isNonNarrative(raw))throw new Error('AI 回應只有分類標籤或空白，並非遊戲劇情');
+ if(isNonNarrative(raw)){
+  const failure=new Error('AI 沒有產生可用劇情，本回合未存檔。請重試或切換免費模型。');
+  failure.status=502;
+  throw failure;
+ }
  return raw;
 }
