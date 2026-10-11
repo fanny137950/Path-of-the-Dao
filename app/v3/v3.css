@@ -40,3 +40,30 @@
 .v3-dev-dossier summary{cursor:pointer;font-size:13px;font-weight:650}
 .v3-dev-dossier p{font-size:12px;opacity:.88;margin:7px 0;line-height:1.7}
 .v3-dev-dossier strong{font-weight:650}
+
+
+/* Developer-only NPC directory: faction > peak > seniority. */
+.v3-dev-grid{grid-template-columns:minmax(235px,285px) minmax(0,1fr)}
+.v3-dev-actors{display:block;max-height:720px;overflow-y:auto;overflow-x:hidden;padding-right:5px}
+.v3-dev-directory-tools{position:sticky;top:0;z-index:2;background:var(--background,#101010);padding:5px 2px 12px;border-bottom:1px solid #8884;margin-bottom:10px}
+.v3-dev-directory-tools label{display:block;font-size:12px;font-weight:650;margin-bottom:7px}
+.v3-dev-directory-tools input[type=search]{display:block;box-sizing:border-box;min-width:0;width:100%;padding:9px 10px;border:1px solid #8886;border-radius:9px;background:var(--background,#101010);color:inherit;font:inherit;font-size:12px}
+.v3-dev-directory-tools p{font-size:11px;margin:8px 0 0;opacity:.7}
+.v3-dev-faction{margin-bottom:9px;border:1px solid #8885;border-radius:10px;overflow:hidden}
+.v3-dev-faction>summary{font-size:13px;font-weight:700;cursor:pointer;padding:10px 11px;background:#8882}
+.v3-dev-faction>summary span,.v3-dev-peak>summary span{float:right;font-size:11px;font-weight:450;opacity:.7;margin-left:6px}
+.v3-dev-peaks{padding:5px 7px 9px}
+.v3-dev-peak{margin-top:5px;border:1px solid #8883;border-radius:8px;overflow:hidden}
+.v3-dev-peak>summary{cursor:pointer;padding:8px 10px;font-size:12px;font-weight:650;background:#8881}
+.v3-dev-rank-groups{padding:4px 6px 8px}
+.v3-dev-rank h5{font-size:11px;opacity:.65;font-weight:600;margin:9px 4px 6px}
+.v3-dev-rank button{width:100%;margin-bottom:5px;padding:7px 9px!important;border-radius:8px;gap:3px;white-space:normal}
+.v3-dev-rank button strong{font-size:12px}
+.v3-dev-rank button small{font-size:11px;opacity:.7}
+.v3-dev-rank button.v3-dev-active{border-color:#85a8cc;background:#668eab29}
+.v3-dev-empty{padding:12px 4px}
+@media(max-width:600px){
+ .v3-dev-grid{grid-template-columns:1fr}
+ .v3-dev-actors{display:block;max-height:460px;overflow-y:auto;overflow-x:hidden;padding-right:0}
+ .v3-dev-rank button{min-width:0}
+}
