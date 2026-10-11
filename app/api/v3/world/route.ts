@@ -71,7 +71,7 @@ export async function POST(request:Request){
     .bind(id,user.userId,'問道九州 V3 · 洛河',0,JSON.stringify(world),new Date().toISOString()).run();
    return reply(playerWorld(world),201);
   }
-  if(!['turn','edit-character'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
+  if(!['turn','advance-time','edit-character'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
   const world=await readWorld(body.world,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
   if(body.op==='edit-character'){
@@ -85,7 +85,13 @@ export async function POST(request:Request){
    if(result.meta.changes!==1)return reply({error:'世界資料已更新，請重試'},409);
    return reply({world:playerWorld(next),developer:developerWorld(next)});
   }
-  const text=body.text;
+  const requestedMinutes=body.advanceMinutes;
+  const isTimeAdvance=body.op==='advance-time';
+  if(isTimeAdvance&&![15,60,360,1440].includes(requestedMinutes))
+   return reply({error:'時間只能推進 15 分鐘、1 小時、6 小時或 1 天'},400);
+  const text=isTimeAdvance
+   ?'洛河選擇在目前位置等待'+({15:'一刻鐘',60:'一個時辰的一半（約一小時）',360:'六個小時',1440:'一整天'} as Record<number,string>)[requestedMinutes]+'，留意周遭的人事變化。'
+   :body.text;
   if(typeof text!=='string'||!text.trim()||text.length>2500)return reply({error:'玩家輸入無效'},400);
   if(typeof body.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(body.requestId))return reply({error:'回合 ID 無效'},400);
   const prior=world.events.find((e:{requestId:string})=>e.requestId===body.requestId);
@@ -97,16 +103,21 @@ export async function POST(request:Request){
   if(key.length>300)return reply({error:'API Key 無效'},400);
   const model=typeof body.model==='string'?body.model:undefined;
   let answer:string,usage:null|{totalTokens?:number}=null;
-  if(mode==='demo')answer='韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
+  if(mode==='demo')answer=isTimeAdvance
+   ?'洛河在原處等待，時間緩緩流逝。來往弟子換了幾批，周遭的宗務照常運作。\n\n（示範模式不會產生動態 NPC 對話，請使用 AI 模式體驗故事。）'
+   :'韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
   else{
-   const args={apiKey:key,instructions,input:gmContext(world,text),maxOutputTokens:1000};
+   const timeDirective=isTimeAdvance
+    ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
+    :'';
+   const args={apiKey:key,instructions:instructions+timeDirective,input:gmContext(world,text),maxOutputTokens:1000};
    const result=mode==='openrouter'
     ?await generateOpenRouterResponse({...args,model:model||'openrouter/free'})
     :await generateGMResponse({...args,model:model||'gpt-4.1-mini'});
    answer=result.text;usage=result.usage;
   }
   answer=stabilizeDecisiveAction(world,text,answer);
-  const next=commitV3Turn(world,text,answer,body.requestId);
+  const next=commitV3Turn(world,text,answer,body.requestId,isTimeAdvance?{advanceMinutes:requestedMinutes}:{});
   // Compare-and-swap: no partial turn or lost concurrent update.
   const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
    .bind(JSON.stringify(next),next.revision,world.id,user.userId,world.revision).run();

@@ -178,3 +178,47 @@
 .v3-action-advance span{margin-right:7px}
 .v3-actions-hint{font-size:11px;color:#81998e;margin:0;line-height:1.7}
 @media(max-width:650px){.v3-actions{padding:7px 2px}.v3-actions-buttons{gap:8px}.v3-actions-buttons button{padding:9px 11px;font-size:12px}.v3-actions-title span{display:inline;margin-left:5px}}
+
+
+/* V3 in-world journal & time travel controls */
+.v3-play-layout{width:min(1320px,100%);margin:0 auto;flex:1;display:grid;grid-template-columns:275px minmax(0,1fr);gap:24px;align-items:start;padding:0 20px}
+.v3-quest-sidebar{position:sticky;top:125px;max-height:calc(100vh - 150px);overflow-y:auto;margin:26px 0 22px;padding:21px 17px;background:linear-gradient(165deg,#18302f,#112427);border:1px solid #b7cdaa2a;border-radius:16px;scrollbar-width:thin;scrollbar-color:#577b69 transparent}
+.v3-quest-heading{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.v3-quest-heading h2{font-family:"Noto Serif TC",ui-serif,serif;font-size:21px;font-weight:500;margin:6px 0;color:#eee8d7;letter-spacing:.06em}
+.v3-quest-count{background:#7ea98927;border:1px solid #a2caa052;border-radius:9px;color:#d2e5cb;padding:4px 9px;font-size:11px}
+.v3-quest-subtitle,.v3-quest-disclaimer{font-size:11px;color:#96aba0;line-height:1.8}
+.v3-quest-subtitle{padding-bottom:14px;border-bottom:1px solid #d3dabb1e}
+.v3-quest-disclaimer{border-top:1px solid #d3dabb1e;margin:17px 0 0;padding-top:14px}
+.v3-quest-empty{font-size:13px;color:#9eb5a5;line-height:1.8}
+.v3-quest-card{padding:16px 11px;margin:12px 0;border:1px solid #b1c5a927;background:#1023248a;border-radius:12px}
+.v3-quest-meta{display:flex;justify-content:space-between;gap:10px;color:#c8d3a9;font-size:10px;letter-spacing:.08em}
+.v3-quest-card h3{font-size:15px;color:#e9e8d9;font-weight:650;margin:12px 0 9px;letter-spacing:.02em}
+.v3-quest-card p{font-size:12px;color:#adbdad;line-height:1.8;margin:0}
+.v3-quest-progress{height:4px;background:#69806c4d;border-radius:9px;margin:15px 0 10px;overflow:hidden}
+.v3-quest-progress span{display:block;height:100%;background:linear-gradient(90deg,#799e7a,#ccdaab);border-radius:9px;transition:width .2s}
+.v3-quest-objective{font-size:11px;color:#c4d7bb;line-height:1.65}
+.v3-main-story{min-width:0;display:flex;flex-direction:column;min-height:calc(100dvh - 148px)}
+.v3-main-story .v3-story-header{width:min(780px,100%);padding-top:34px}
+.v3-main-story .v3-messages{width:min(840px,100%)}
+.v3-main-story .v3-compose{margin-top:auto;position:sticky;bottom:0;width:100%;padding:17px 22px 16px;border-radius:15px 15px 0 0}
+.v3-journal-toggle{display:none}
+.v3-time-controls{display:flex;align-items:center;justify-content:space-between;gap:13px;flex-wrap:wrap;border-top:1px solid #b2c7b025;margin-top:13px;padding-top:13px}
+.v3-time-control-label{display:flex;flex-direction:column;gap:4px;color:#cad7b5;font-size:12px}
+.v3-time-control-label small{font-size:10px;color:#8fa69a}
+.v3-time-options{display:flex;flex-wrap:wrap;gap:7px}
+.v3-shell .v3-time-options button{border:1px solid #9fb79f46;border-radius:9px;background:#1d3632;color:#d9e8d7;font-size:11px;min-height:35px;padding:7px 12px;white-space:nowrap}
+.v3-shell .v3-time-options button:hover:not(:disabled){background:#355747;border-color:#b8d1ac83}
+@media(max-width:1000px){.v3-play-layout{grid-template-columns:230px minmax(0,1fr);gap:13px;padding:0 12px}.v3-quest-sidebar{padding:15px 11px}.v3-main-story .v3-compose{padding:13px}}
+@media(max-width:740px){
+ .v3-play-layout{display:flex;flex-direction:column;padding:0 10px;gap:0}
+ .v3-main-story{width:100%;min-height:unset;order:0}
+ .v3-quest-sidebar{position:static;order:-1;display:none;width:100%;max-height:330px;overflow-y:auto;margin:12px 0 0}
+ .v3-quest-sidebar.v3-journal-open{display:block}
+ .v3-journal-toggle{display:block;align-self:flex-start;margin:14px 4px 0;padding:9px 13px;border:1px solid #acc3a34c;border-radius:9px;background:#1b3530;color:#d6e9d2;font-size:12px}
+ .v3-main-story .v3-story-header{padding-top:27px}
+ .v3-main-story .v3-compose{padding:12px 9px;border-radius:12px 12px 0 0}
+ .v3-time-controls{align-items:stretch;gap:10px}
+ .v3-time-control-label{flex:1}
+ .v3-time-options{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+ .v3-shell .v3-time-options button{padding:8px 3px;font-size:10px}
+}
