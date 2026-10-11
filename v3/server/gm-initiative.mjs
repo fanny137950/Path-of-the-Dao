@@ -45,7 +45,7 @@ export function assessContinueReply(text,raw){
  const narrative=visibleNarrative(raw||'').trim();
  if(!narrative||narrative.length<24)return {ok:false,reason:'too-short'};
  const tail=narrative.slice(-190).replace(/\s+/g,'');
- const canned=/(?:你(?:還|还)?有(?:什麼|什么)(?:其他)?(?:問題|问题|想問|想问)|你(?:想|要)(?:先|不先|不)?(?:做|問|问|去哪|知道)|你(?:會|会)(?:怎麼|怎么)(?:做|選擇)|要不要(?:先)?(?:去|問|问|看看|繼續)|還是(?:想|要)(?:先)?(?:去|問|问)|可(?:以|自行)選擇|或者(?:你)?(?:想|先)|你覺得呢|你打算怎麼辦|你準備怎麼做)/;
+ const canned=/(?:你(?:還|还)?有(?:什麼|什么)(?:其他)?(?:問題|问题|想問|想问)|你(?:想|要)(?:先|不先|不)?(?:做|問|问|去哪|知道)|你(?:會|会)(?:怎麼|怎么)(?:做|選擇)|要不要(?:先)?(?:去|問|问|看看|繼續)|還是(?:想|要)(?:先)?|可(?:以|自行)選擇|或者(?:你)?(?:想|先)|你覺得呢|你打算怎麼辦|你準備怎麼做)/;
  const endsWithMenu=canned.test(tail)&&/[？?」]?\s*$/.test(tail);
  if(!endsWithMenu)return {ok:true,reason:'no-stock-menu'};
  // A genuine new action can end in an NPC question; tolerate it when clear.
