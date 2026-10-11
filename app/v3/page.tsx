@@ -13,8 +13,8 @@ export default function V3(){
  const [turn,setTurn]=useState(0);const [usage,setUsage]=useState<number|null>(null);
  const bottom=useRef<HTMLDivElement>(null);
  useEffect(()=>{try{const s=localStorage.getItem(key);if(s){const v=JSON.parse(s);if(Array.isArray(v.messages)&&v.messages.length){setMessages(v.messages);setTurn(v.turn||0)}}}catch{}},[]);
- useEffect(()=>{try{localStorage.setItem(key,JSON.stringify({messages,turn}))}catch{};bottom.current?.scrollIntoView({behavior:'smooth'})},[messages,turn]);
- function reset(){if(!confirm('重新開始 V3 試玩？此操作會清除本瀏覽器的 V3 試玩紀錄，不影響舊版存檔。'))return;setMessages([{role:'assistant',content:intro}]);setTurn(0);setError('')}
+ useEffect(()=>{if(turn===0&&messages.length===1)return;try{localStorage.setItem(key,JSON.stringify({messages,turn}))}catch{};bottom.current?.scrollIntoView({behavior:'smooth'})},[messages,turn]);
+ function reset(){if(!confirm('重新開始 V3 試玩？此操作會清除本瀏覽器的 V3 試玩紀錄，不影響舊版存檔。'))return;localStorage.removeItem(key);setMessages([{role:'assistant',content:intro}]);setTurn(0);setError('')}
  async function send(){const value=text.trim();if(!value||busy)return;setBusy(true);setError('');setText('');
  const next=[...messages,{role:'user' as const,content:value}];setMessages(next);
  try{const res=await fetch('/api/v3/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,model,apiKey:mode==='ai'?apiKey:undefined,messages:next.slice(-20),turn})});
