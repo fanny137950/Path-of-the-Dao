@@ -1,4 +1,5 @@
-import {isNonNarrative,requireNarrative} from './narrative.mjs';
+import {isNonNarrative,requireNarrative,visibleNarrative} from './narrative.mjs';
+import {initialScene,sceneOf,updateScene,sceneContext} from './scene-context.mjs';
 import {initialLivingWorld,elapsedMinutes,timeCost,advanceLivingWorld,maybeWriteChapter,recallChapters,worldPlanForGM} from './living-world.mjs';
 import {pendingRootResult,rootResultConfirmed} from './action-rules.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
@@ -31,7 +32,7 @@ export const NPCS=Object.freeze({
 export function initialV3World(id){
  return {id,mode:'v3',version:4,revision:0,minute:480,day:1,location:'太虛宗山門',
   protagonist:{name:'洛河',age:15,realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld()};
+  npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene()};
 }
 export function validatedWorld(value){
  if(!value||value.mode!=='v3'||!Array.isArray(value.messages)||!Array.isArray(value.events)
@@ -39,6 +40,7 @@ export function validatedWorld(value){
  ||typeof value.npcs!=='object'||!value.protagonist)throw Error('世界資料損毀');
  value.version=4;
  value.living??=initialLivingWorld();
+ value.scene??=sceneOf(value);
  value.developerAudit??=[];
  for(const [id,defaults] of Object.entries(NPCS)){
   const original=value.npcs[id]||{};
@@ -62,8 +64,10 @@ export function playerWorld(world){
  location:world.location,protagonist:world.protagonist,
   // Keep old D1 event history untouched, but do not render legacy classifier
   // outputs as if they were a character's dialogue.
-  messages:world.messages.map(m=>m.role==='assistant'&&isNonNarrative(m.content)
-   ?{...m,content:'（先前免費模型的回應無效，已排除在遊戲劇情之外。）'}:m),
+  messages:world.messages.map(m=>m.role==='assistant'
+   ?{...m,content:isNonNarrative(m.content)
+      ?'（先前免費模型的回應無效，已排除在遊戲劇情之外。）'
+      :visibleNarrative(m.content)}:m),
   phase:'freeform',choices:[]};
 }
 export function developerWorld(world){
@@ -95,12 +99,12 @@ export function gmContext(world,userText){
  const badEvents=new Set(world.events.filter(e=>isNonNarrative(e.reply)).map(e=>e.id));
  const recent=world.messages.slice(-22)
   .filter(m=>m.role!=='assistant'||!isNonNarrative(m.content))
-  .map(m=>(m.role==='user'?'洛河':'GM')+'：'+shorten(m.content,520)).join('\n\n');
+  .map(m=>(m.role==='user'?'洛河':'GM')+'：'+shorten(m.role==='assistant'?visibleNarrative(m.content):m.content,520)).join('\n\n');
  const present=nearbyCharacters(world);
  const people=present.map(actor=>{
   const personal=(actor.memories||[]).filter(m=>!badEvents.has(m.eventId));
   const memory=recalledMemories({...actor,memories:personal},userText,7)
-   .map(m=>'第'+m.day+'日・'+m.kind+'：'+shorten(m.text,210)).join('；');
+   .map(m=>'第'+m.day+'日・'+m.kind+'：'+shorten(visibleNarrative(m.text),210)).join('；');
   const notes=actor.privateNotes.length?'【只有這個NPC及GM知道的私密備註】'+actor.privateNotes.slice(-3).join('；'):'';
   return '【'+actor.name+'／'+actor.id+'】'+actor.role+'，境界'+actor.realm+'，'+actor.status+'、'+actor.mood+
    '。對洛河：好感'+actor.relationships.player.favor+'，信任'+actor.relationships.player.trust+
@@ -112,16 +116,17 @@ export function gmContext(world,userText){
   .map((e,i)=>({e,score:terms(e.text+' '+e.reply).size+
     [...terms(userText)].filter(t=>terms(e.text+' '+e.reply).has(t)).length*10+i/Math.max(world.events.length,1)}))
   .sort((a,b)=>b.score-a.score).slice(0,7)
-  .map(({e})=>'第'+e.day+'日：洛河 '+shorten(e.text,100)+'；'+shorten(e.reply,140)).join('\n');
+  .map(({e})=>'第'+e.day+'日：洛河 '+shorten(e.text,100)+'；'+shorten(visibleNarrative(e.reply),140)).join('\n');
  const chapters=recallChapters(world,userText,3)
   .map(c=>'【舊章節第'+c.from+'—'+c.to+'回合】'+shorten(c.text,650)).join('\n');
  const expectedRoot=pendingRootResult(world,userText);
- const rootRule=expectedRoot?'【本回合可能的測靈根結算】若玩家確實把手放在測靈石上且測試成功，客觀結果必須是「'+expectedRoot+'」，不可改成其他靈根。若遭阻止或行動失敗，明確敘述失敗而不得宣布已測定。':'';
+ const rootRule=expectedRoot?'【本回合優先結算】洛河正在把手掌按到測靈石表面。請直接描寫陣紋與結果，韓守一應宣布靈根「'+expectedRoot+'」。不得把整顆測靈石說成洛河拿起或放下的物件，不得停在等待測試結果。只有真正被阻止時才能不公布結果。':'';
  const scene='【客觀世界】第'+world.day+'日 '+Math.floor(world.minute/60)+':' +
   String(world.minute%60).padStart(2,'0')+'，地點'+world.location+'。洛河，'+
   world.protagonist.age+'歲，境界'+world.protagonist.realm+'，靈根'+world.protagonist.spiritualRoot+'。';
  const output=[
   scene.slice(0,500),
+  sceneContext(world,userText).slice(0,850),
   ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。不在場NPC不能憑空旁聽、瞬移或知道他人的私密知情。').slice(0,220),
   people.slice(0,1900),
   worldPlanForGM(world).slice(0,1050),
@@ -140,7 +145,7 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:raw.trim(),changes:[],move:null};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null};
  const narration=raw.slice(0,match.index).trim();
  let changes=[],move=null;
  try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
@@ -186,6 +191,8 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
  if(approvedMove)next.location=move.to;
  const root=rootResultConfirmed(world,userText,parsed.narration);
  if(root)next.protagonist.spiritualRoot=root;
+ next.scene=updateScene(sceneOf(world),parsed.narration,next.location);
+ if(root)next.scene.focus='測試結果';
  const eventId='turn:'+next.revision;
  const seenBy=privacyHint(userText)?[]:[...present];
  next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration});
