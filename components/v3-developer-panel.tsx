@@ -1,5 +1,6 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
+import {organizeCharacters,countCharacters} from '../v3/server/character-index.mjs';
 
 type Memory={id:string;eventId:string;kind:string;day:number;minute:number;text:string;source:string};
 type Character={
@@ -38,6 +39,8 @@ export default function V3DeveloperPanel({
 }){
  const [data,setData]=useState<DeveloperData|null>(null);
  const [selected,setSelected]=useState('registrar');
+ const [characterSearch,setCharacterSearch]=useState('');
+ const [openedGroups,setOpenedGroups]=useState<Record<string,boolean>>({});
  const [draft,setDraft]=useState<Draft|null>(null);
  const [error,setError]=useState('');const [notice,setNotice]=useState('');
  const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);
@@ -57,6 +60,11 @@ export default function V3DeveloperPanel({
   return()=>abort.abort();
  },[worldId,revision]);
  const actor=data?.characters[selected]||null;
+ const directory=useMemo(()=>organizeCharacters(data?.characters||{},{
+  peaks:data?.worldBible?.sect?.peaks,query:characterSearch,
+ }),[data?.characters,data?.worldBible?.sect?.peaks,characterSearch]);
+ const totalCharacters=Object.keys(data?.characters||{}).length;
+ const matchedCharacters=countCharacters(directory);
  useEffect(()=>{setDraft(actor?fromCharacter(actor):null)},[actor?.id,data?.revision]);
  const change=(field:keyof Draft,value:string)=>setDraft(d=>d?{...d,[field]:value}:d);
  const save=async()=>{
@@ -96,11 +104,46 @@ export default function V3DeveloperPanel({
     <p>洛河的思想、性格發展與重大決定由玩家控制，原型設定不限制玩家自由演出。</p>
    </details>}
   {data&&<div className="v3-dev-grid">
-   <aside className="v3-dev-actors">
-    <p>第 {data.day} 日 · 共 {Object.keys(data.characters).length} 位人物 · 回合 {data.revision}</p>
-    {Object.values(data.characters).map(c=><button key={c.id} className={selected===c.id?'v3-dev-active':''} onClick={()=>setSelected(c.id)}>
-     <strong>{c.name}</strong><small>{c.realm} · {c.mood}</small>
-    </button>)}
+   <aside className="v3-dev-actors" aria-label="依勢力、山峰與職級分類的人物名錄">
+    <div className="v3-dev-directory-tools">
+     <label htmlFor="v3-character-search">搜尋人物／山峰／境界／資質</label>
+     <input id="v3-character-search" type="search" value={characterSearch}
+      onChange={e=>{setCharacterSearch(e.target.value);setOpenedGroups({})}}
+      placeholder="例如：沈滄月、築基、棲風峰"
+      aria-label="搜尋人物姓名、宗門、境界、靈根與資質"/>
+     <p aria-live="polite">第 {data.day} 日 · 顯示 {matchedCharacters}／{totalCharacters} 位 NPC</p>
+    </div>
+    {directory.length===0?<p className="v3-dev-empty">找不到符合條件的人物，請嘗試其他關鍵字。</p>
+    :directory.map(faction=><details key={faction.id+(characterSearch.trim()?':search':'')} 
+      className="v3-dev-faction"
+      open={openedGroups[faction.id]??(faction.id==='taixu'||Boolean(characterSearch.trim()))}
+      onToggle={e=>{const expanded=e.currentTarget.open;setOpenedGroups(prev=>
+       prev[faction.id]===expanded?prev:{...prev,[faction.id]:expanded})}}>
+      <summary>{faction.name}<span>{faction.count} 人</span></summary>
+      <div className="v3-dev-peaks">
+       {faction.sections.map(section=><details key={section.id+(characterSearch.trim()?':search':'')}
+        className="v3-dev-peak"
+        open={openedGroups[faction.id+':'+section.id]??(
+         Boolean(characterSearch.trim())||section.id==='山門'||section.id==='棲風峰')}
+        onToggle={e=>{const expanded=e.currentTarget.open;const key=faction.id+':'+section.id;
+         setOpenedGroups(prev=>prev[key]===expanded?prev:{...prev,[key]:expanded})}}>
+        <summary>{section.name}<span>{section.count}</span></summary>
+        <div className="v3-dev-rank-groups">
+         {section.ranks.map(rank=><div className="v3-dev-rank" key={rank.id}>
+          <h5>{rank.name} · {rank.people.length}</h5>
+          {rank.people.map(c=><button type="button" key={c.id}
+           aria-pressed={selected===c.id}
+           className={selected===c.id?'v3-dev-active':''}
+           onClick={()=>setSelected(c.id)}>
+           <strong>{c.name}</strong>
+           <small>{c.realm} · 資質{c.aptitude?.grade||'未知'}</small>
+           <small>{c.role}</small>
+          </button>)}
+         </div>)}
+        </div>
+       </details>)}
+      </div>
+     </details>)}
    </aside>
    <div className="v3-dev-details">
     {!actor||!draft?<p>請選擇人物。</p>:<>
