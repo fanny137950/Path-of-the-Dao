@@ -1,4 +1,2 @@
-'use client';
-import StoryGame from '../components/story-game';
-import './story.css';
-export default function Page(){return <StoryGame/>;}
+// V3 is the new default experience. V2 remains available at /v2.
+export {default} from './v3/page';
