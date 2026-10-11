@@ -40,12 +40,14 @@ export const NPCS=Object.freeze(Object.fromEntries(CHARACTER_BIBLE.map(actor=>[
 ])));
 
 export function initialV3World(id){
- return {id,mode:'v3',version:4,revision:0,minute:480,day:1,location:'太虛宗山門',
+ const initial={id,mode:'v3',version:4,revision:0,minute:480,day:1,location:'太虛宗山門',
   protagonist:{name:'洛河',age:15,gender:'女',hometown:'青石鎮',
    family:clone(WORLD_BIBLE.protagonist.family),
    aptitude:{grade:'未知',description:'尚未完成靈根與資質測試；不能僅因往昔世界線直接認定。'},
    realm:'凡人',spiritualRoot:'未測定'},
   npcs:clone(NPCS),npcAgency:null,eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
+ initial.npcAgency=initialNPCAgency(initial);
+ return initial;
 }
 export function validatedWorld(value){
  if(!value||value.mode!=='v3'||!Array.isArray(value.messages)||!Array.isArray(value.events)
