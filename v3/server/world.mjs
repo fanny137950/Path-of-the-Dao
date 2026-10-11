@@ -2,6 +2,7 @@
 export const V3_INTRO='太虛宗收徒大典，山門前人潮如織。高臺上，負責測試靈根的執事抬起眼。\n\n「下一位。姓名？」\n\n你是十五歲的洛河，今日第一次踏入太虛宗。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
 export const CONDITIONS=['健康','輕傷','受傷','重傷','休養'];
+export const LOCATIONS=['太虛宗山門','太虛宗主峰','棲風峰','演武場','藏經樓','內門居所'];
 const clone=x=>structuredClone(x);
 const shorten=(x,max=180)=>typeof x==='string'?x.trim().slice(0,max):'';
 const clamp=(n,min=-100,max=100)=>Math.min(max,Math.max(min,n));
@@ -103,12 +104,13 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:raw.trim(),changes:[]};
+ if(!match)return {narration:raw.trim(),changes:[],move:null};
  const narration=raw.slice(0,match.index).trim();
- let changes=[];
- try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);}
+ let changes=[],move=null;
+ try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
+  if(parsed.move&&typeof parsed.move==='object')move=parsed.move;}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move};
 }
 function applyChanges(next,changes,text,narration,present){
  const evidenceText=text+'\n'+narration;
@@ -132,12 +134,22 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
  if(world.events.some(e=>e.requestId===requestId))throw Error('重複回合');
  if(world.events.length>=1000)throw Error('試玩世界已達1000回合，請先備份');
  const present=new Set(presentIds(world)),parsed=parseGMResult(rawAnswer),next=clone(world);
- next.revision++;next.minute+=5;
- if(next.minute>=1440){next.minute-=1440;next.day++;}
+ const move=parsed.move;
+ // A narrative alone cannot teleport the player. Movement needs a matching player request,
+ // a known destination and quoted evidence of arrival in the GM response.
+ const approvedMove=move&&LOCATIONS.includes(move.to)&&move.to!==world.location&&
+  (userText.includes(move.to)||/(前往|走向|跟著|隨同|出發|帶我去)/.test(userText))&&
+  typeof move.evidence==='string'&&move.evidence.length>=4&&move.evidence.length<=100&&
+  parsed.narration.includes(move.evidence)&&/(抵達|到達|來到|走進|進入)/.test(move.evidence)&&
+  !/(尚未|未能|無法|不能|沒能|不准)/.test(move.evidence);
+ next.revision++;next.minute+=approvedMove?30:5;
+ while(next.minute>=1440){next.minute-=1440;next.day++;}
+ if(approvedMove)next.location=move.to;
  const eventId='turn:'+next.revision,seenBy=privacyHint(userText)?[]:[...present];
  next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration});
  next.events.push({requestId,id:eventId,revision:next.revision,day:next.day,minute:next.minute,
- type:'conversation',text:userText,reply:parsed.narration,location:world.location,witnesses:seenBy});
+ type:'conversation',text:userText,reply:parsed.narration,location:world.location,
+ destination:approvedMove?move.to:null,witnesses:seenBy});
  for(const id of seenBy){
   const actor=next.npcs[id];
   actor.knowledge.push(eventId);
