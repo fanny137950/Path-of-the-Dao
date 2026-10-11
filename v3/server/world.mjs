@@ -171,7 +171,7 @@ export function gmContext(world,userText){
   sceneConversationForGM(world,userText,5700),
   '【洛河最新輸入】'+userText,
   rootRule,
-  '【GM主動性與回應原則】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
+  '【GM主動性】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
  ].filter(Boolean);
  const optional=[
   people.slice(0,1500),
@@ -183,7 +183,7 @@ export function gmContext(world,userText){
   npcDailyPlanForGM(world,240),
   dailyTickForGM(world,150),
   worldPlanForGM(world).slice(0,200),
-  ('【較遠經歷（GM核對用，非所有NPC共有記憶）】\n'+durable).slice(0,500),
+  ('【較遠的重要舊事（GM核對用，非所有NPC共有記憶）】\n'+durable).slice(0,500),
   chapters.slice(0,120)
  ].filter(Boolean);
  // Reserve the active dialogue and newest action before any optional records.
