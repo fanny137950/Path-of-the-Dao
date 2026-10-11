@@ -60,3 +60,14 @@ test('non pacing dialogue is not treated as a request to fast forward',()=>{
  assert.equal(sceneJumpPlan(w,'繼續'),null);
  assert.equal(sceneJumpPlan(w,'跳到宗門論道').label,'年度論道');
 });
+
+test('old saves recover named speakers from earlier narration, only once',()=>{
+ const old=initialV3World('legacy-npc-speaker');
+ delete old.legacyNPCBackfillVersion;
+ old.messages.push({role:'user',content:'你是誰'},{role:'assistant',content:'少年點頭：「我叫葉沖。」'});
+ const hydrated=validatedWorld(old);
+ assert.equal(Object.values(hydrated.npcs).filter(n=>n.name==='葉沖').length,1);
+ assert.equal(hydrated.legacyNPCBackfillVersion,1);
+ const again=validatedWorld(hydrated);
+ assert.equal(Object.values(again.npcs).filter(n=>n.name==='葉沖').length,1);
+});
