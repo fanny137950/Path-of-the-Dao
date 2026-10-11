@@ -161,20 +161,21 @@ export function gmContext(world,userText){
   scene.slice(0,500),
   sceneContext(world,userText).slice(0,850),
   ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。不在場NPC不能憑空旁聽、瞬移或知道他人的私密知情。').slice(0,220),
-  loreForGM(world,userText,2050),
-  people.slice(0,2300),
-  worldPlanForGM(world).slice(0,550),
-  eventCalendarForGM(world,1300),
-  npcAgencyForGM(world,1050),
-  npcDecisionContext(world,420),
-  ('【長期重要經歷（依存檔原話，不代表每個NPC都知情）】\n'+durable).slice(0,1300),
-  chapters.slice(0,280),
-  episodicMemoriesForGM(world,userText,1100),
-  sceneConversationForGM(world,userText,4700),
+  // Conversation is the primary GM context, never reconstructed from NPC
+  // memories or a quest ledger. Reserve it ahead of optional world dossiers.
+  sceneConversationForGM(world,userText,5700),
+  episodicMemoriesForGM(world,userText,1000),
+  people.slice(0,1900),
+  loreForGM(world,userText,1250),
+  eventCalendarForGM(world,850),
+  npcAgencyForGM(world,650),
+  npcDecisionContext(world,300),
+  worldPlanForGM(world).slice(0,250),
+  ('【較遠的重要舊事：僅供GM核對，不是現場人物的共同記憶】\n'+durable).slice(0,650),
+  chapters.slice(0,150),
   '【洛河最新輸入】'+userText,
   rootRule,
-  '【GM主動性】GM 必須管理NPC主動性，而非每回合只等洛河發令。讓NPC按照工作、立場、性格與眼前事件自行說話、互動、離場或引入新人物；並可表現真正在進行的宗門日常、已發生且角色有途徑知曉的世界事件。一般對話保持自然，避免每回合塞危機。玩家只說「繼續」時，應當至少讓眼前NPC採取一個有意義的新行動／說一句帶有新資訊的話，或讓可觀察的事件、時間與人物互動有所進展；不可只重複場景和詢問玩家要做什麼。若目前需要洛河親自決定是否觸碰、戰鬥、拜師等，GM 可以推進NPC的反應、催促或環境，但不能代洛河執行該決定。選項只是可選的輸入捷徑，不限制玩家自由行動。'
-
+  '【GM主動性】GM 必須管理NPC主動性，而非每回合只等洛河發令。讓NPC按照工作、立場、性格與眼前事件自行說話、互動、離場或引入新人物；並可表現真正在進行的宗門日常、已發生且角色有途徑知曉的世界事件。一般對話保持自然，避免每回合塞危機。玩家只說「繼續」時，應當至少讓眼前NPC採取一個有意義的新行動／說一句帶有新資訊的話，或讓可觀察的事件、時間與人物互動有所進展；不可只重複場景和詢問玩家要做什麼。若目前需要洛河親自決定是否觸碰、戰鬥、拜師等，GM 可以推進NPC的反應、催促或環境，但不能代洛河執行該決定。對話原文優先於記憶摘錄：記憶只表示人物個別狀態、知情與對洛河的看法；任務排程只用來核對時間與事件進度，不能取代自然對話。'
  ];
  // Fit optional sections without cutting the last (authoritative) user action
  // or GM constraints. Scene transcript has priority over background lore.
