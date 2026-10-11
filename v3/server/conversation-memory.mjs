@@ -58,13 +58,23 @@ export function sceneConversationForGM(world,userText,maxChars=4900){
  }
  const toLines=e=>'第'+e.day+'日 '+String(Math.floor(e.minute/60)).padStart(2,'0')+':'+String(e.minute%60).padStart(2,'0')+
   '\n洛河：'+clean(e.text,2500)+'\nGM：'+clean(visibleNarrative(e.reply),8000);
- // Reserve more for the most recent turns, and keep them intact when possible.
+ // A contiguous suffix matters more than isolated older lines: skipping a
+ // long recent reply would create a misleading hole in an active exchange.
  const lines=events.map(toLines);
  const selected=[],older=[];
  let remaining=Math.max(700,maxChars-120);
+ let boundary=events.length;
  for(let i=lines.length-1;i>=0;i--){
-  if(lines[i].length+2<=remaining){selected.unshift(lines[i]);remaining-=lines[i].length+2;}
-  else{older.unshift(events[i]);}
+  if(lines[i].length+2>remaining){boundary=i+1;break;}
+  selected.unshift(lines[i]);remaining-=lines[i].length+2;
+  boundary=i;
+ }
+ older.push(...events.slice(0,boundary));
+ // If the most recent exchange alone is very long, keep its final portion,
+ // labeled as an excerpt; never replace it with an unrelated older turn.
+ if(!selected.length&&lines.length){
+  selected.push('【最新回合原文尾段】'+lines.at(-1).slice(-Math.max(350,maxChars-190)));
+  older.splice(-1,1);
  }
  // Keep precise older source excerpts for continuity (not fabricated claims).
  const excerpts=older.filter(e=>important.test(e.text+' '+e.reply)).slice(-4)
