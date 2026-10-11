@@ -4,13 +4,16 @@ import './v3.css';
 import V3DeveloperPanel from '../../components/v3-developer-panel';
 type Msg={role:'user'|'assistant';content:string};
 type SuggestedAction={label:string;text:string;kind?:'action'|'advance'};
+type Quest={id:string;title:string;type:string;status:string;description:string;objective:string;progress:number;updatedDay:number};
 const intro='太虛宗收徒大典，山門前人潮如織。高臺上，負責測試靈根的執事抬起眼。\n\n「下一位。姓名？」\n\n你是十五歲的洛河，今日第一次踏入太虛宗。';
 // New local pointer deliberately starts a fresh V3 test world; old test rows remain untouched.
 const worldKey='wendao-v3-chat-first-world';
-type WorldView={id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];suggestions?:SuggestedAction[];usage?:{totalTokens?:number}|null;error?:string};
+type WorldView={id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];journal?:Quest[];suggestions?:SuggestedAction[];usage?:{totalTokens?:number}|null;error?:string};
 export default function V3(){
  const [messages,setMessages]=useState<Msg[]>([{role:'assistant',content:intro}]);
  const [suggestions,setSuggestions]=useState<SuggestedAction[]>([]);
+ const [journal,setJournal]=useState<Quest[]>([]);
+ const [journalOpen,setJournalOpen]=useState(false);
  const [text,setText]=useState('');const [busy,setBusy]=useState(false);
  const [apiKey,setApiKey]=useState('');const [model,setModel]=useState('openrouter/free');
  const [settings,setSettings]=useState(false);const [dev,setDev]=useState(false);
@@ -24,6 +27,7 @@ export default function V3(){
   if(!world.id||!Array.isArray(world.messages))throw Error('世界資料格式錯誤');
   setWorldId(world.id);setMessages(world.messages);setTurn(world.revision);
   setSuggestions(Array.isArray(world.suggestions)?world.suggestions.filter(x=>typeof x?.text==='string'&&typeof x?.label==='string').slice(0,4):[]);
+  setJournal(Array.isArray(world.journal)?world.journal:[]);
   setDay(world.day);setMinute(world.minute);setLocation(world.location||'太虛宗山門');
   setUsage(typeof world.usage?.totalTokens==='number'?world.usage.totalTokens:null);
   localStorage.setItem(worldKey,world.id);
@@ -56,11 +60,11 @@ export default function V3(){
   setLoading(true);setError('');
   try{await createWorld()}catch(e){setError(e instanceof Error?e.message:'建立世界失敗')}finally{setLoading(false)}
  }
- async function send(quickText?:string){
+ async function send(quickText?:string,advanceMinutes?:number){
   const value=(quickText??text).trim();if(!value||busy||loading||!worldId)return;
   setBusy(true);setError('');setText('');
   try{
-   const res=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'turn',world:worldId,requestId:crypto.randomUUID(),text:value,mode,model,apiKey:mode!=='demo'?apiKey:undefined})});
+   const res=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:advanceMinutes?'advance-time':'turn',advanceMinutes,world:worldId,requestId:crypto.randomUUID(),text:value,mode,model,apiKey:mode!=='demo'?apiKey:undefined})});
    const data=await res.json() as WorldView;
    if(!res.ok)throw Error(data.error||'回合提交失敗');
    applyWorld(data);
@@ -68,6 +72,10 @@ export default function V3(){
   finally{setBusy(false)}
  }
  const panel=dev?'dev':settings?'settings':'story';
+ const advanceTime=(minutes:number)=>{
+  if(busy||loading||!worldId||text.trim())return;
+  void send('等待時間流逝',minutes);
+ };
  const clock=String(Math.floor(minute/60)).padStart(2,'0')+':'+String(minute%60).padStart(2,'0');
  const modeName=mode==='ai'?'OpenAI':mode==='openrouter'?'OpenRouter':'示範模式';
  return <main className="v3-shell">
@@ -116,6 +124,25 @@ export default function V3(){
   </section>}
   {panel==='dev'&&worldId&&<div className="v3-dev-workspace"><V3DeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/></div>}
   {panel==='story'&&<>
+   <div className="v3-play-layout">
+    <aside className={'v3-quest-sidebar'+(journalOpen?' v3-journal-open':'')} aria-label="洛河已知的進行中任務">
+     <div className="v3-quest-heading"><div><span className="v3-eyebrow">QUEST JOURNAL</span><h2>任務手札</h2></div>
+      <span className="v3-quest-count">{journal.length}</span></div>
+     <p className="v3-quest-subtitle">只有洛河已知的線索與任務會出現在這裡。</p>
+     {journal.length===0?<p className="v3-quest-empty">目前沒有已記錄的任務。先在九州四處看看。</p>:
+      journal.map(quest=><article key={quest.id} className="v3-quest-card">
+       <div className="v3-quest-meta"><span>{quest.type}</span><span>{quest.status}</span></div>
+       <h3>{quest.title}</h3><p>{quest.description}</p>
+       <div className="v3-quest-progress" role="progressbar" aria-label={quest.title+'進度'}
+        aria-valuemin={0} aria-valuemax={100} aria-valuenow={quest.progress}>
+        <span style={{width:quest.progress+'%'}}/></div>
+       <div className="v3-quest-objective">目前方向 · {quest.objective}</div>
+      </article>)}
+     <p className="v3-quest-disclaimer">任務可以被忽略、拒絕或走向不同結局。部分事件會自行發展。</p>
+    </aside>
+    <div className="v3-main-story">
+     <button type="button" className="v3-journal-toggle" aria-expanded={journalOpen}
+      onClick={()=>setJournalOpen(x=>!x)}>{journalOpen?'收起任務手札':'查看任務手札'} · {journal.length}</button>
    <div className="v3-story-header"><span className="v3-eyebrow">TAIXU SECT · CHAPTER {String(day).padStart(2,'0')}</span>
     <h1>{location}</h1>
     <div className="v3-story-ornament" aria-hidden="true"><span></span>✦<span></span></div>
@@ -154,8 +181,21 @@ export default function V3(){
       <span>送出</span><span aria-hidden="true">↗</span>
      </button>
     </div>
-    <p className="v3-compose-hint">Enter 送出 · Shift + Enter 換行 · 每一段對話都保存在世界存檔中</p>
+    <div className="v3-time-controls" aria-label="遊戲時間控制">
+     <div className="v3-time-control-label"><span>◷　推進時間</span><small>時間會影響宗門日常與事件進程</small></div>
+     <div className="v3-time-options">
+      {([{minutes:15,label:'15 分鐘'},{minutes:60,label:'1 小時'},
+         {minutes:360,label:'6 小時'},{minutes:1440,label:'1 天'}] as const).map(option=>
+       <button type="button" key={option.minutes} onClick={()=>advanceTime(option.minutes)}
+        disabled={busy||loading||!worldId||Boolean(text.trim())}
+        title={text.trim()?'請先送出或清空輸入的文字':'在目前位置等待，讓世界推進 '+option.label}>
+        + {option.label}</button>)}
+     </div>
+    </div>
+    <p className="v3-compose-hint">Enter 送出 · Shift + Enter 換行 · 時間與對話皆保存在世界存檔中</p>
    </footer>
+    </div>
+   </div>
   </>}
  </main>;
 }
