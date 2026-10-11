@@ -34,7 +34,10 @@ export const NPCS=Object.freeze(Object.fromEntries(CHARACTER_BIBLE.map(actor=>[
 
 export function initialV3World(id){
  return {id,mode:'v3',version:4,revision:0,minute:480,day:1,location:'太虛宗山門',
-  protagonist:{name:'洛河',age:15,realm:'凡人',spiritualRoot:'未測定'},
+  protagonist:{name:'洛河',age:15,gender:'女',hometown:'青石鎮',
+   family:clone(WORLD_BIBLE.protagonist.family),
+   aptitude:{grade:'未知',description:'尚未完成靈根與資質測試；不能僅因往昔世界線直接認定。'},
+   realm:'凡人',spiritualRoot:'未測定'},
   npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
 }
 export function validatedWorld(value){
@@ -43,6 +46,10 @@ export function validatedWorld(value){
  ||typeof value.npcs!=='object'||!value.protagonist)throw Error('世界資料損毀');
  value.version=4;
  value.bibleVersion=Number.isInteger(value.bibleVersion)?value.bibleVersion:WORLD_BIBLE_VERSION;
+ value.protagonist.gender??='女';
+ value.protagonist.hometown??='青石鎮';
+ value.protagonist.family??=clone(WORLD_BIBLE.protagonist.family);
+ value.protagonist.aptitude??={grade:'未知',description:'尚未完成完整資質評估'};
  value.living??=initialLivingWorld();
  value.scene??=sceneOf(value);
  value.developerAudit??=[];
@@ -77,7 +84,8 @@ export function playerWorld(world){
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
   location:world.location,bibleVersion:WORLD_BIBLE_VERSION,
-  worldBible:clone(WORLD_BIBLE),characters:clone(world.npcs),events:clone(world.events.slice(-25)),
+  worldBible:clone(WORLD_BIBLE),protagonist:clone(world.protagonist),
+  characters:clone(world.npcs),events:clone(world.events.slice(-25)),
   audit:clone((world.developerAudit||[]).slice(-25))};
 }
 const presentIds=world=>Object.keys(world.npcs).filter(id=>world.npcs[id].where===world.location);
