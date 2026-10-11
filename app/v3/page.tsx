@@ -77,6 +77,8 @@ export default function V3(){
   void send('等待時間流逝',minutes);
  };
  const clock=String(Math.floor(minute/60)).padStart(2,'0')+':'+String(minute%60).padStart(2,'0');
+ const hour=Math.floor(minute/60);
+ const daypart=hour<5?'深夜':hour<11?'上午':hour<13?'正午':hour<18?'下午':hour<22?'夜晚':'深夜';
  const modeName=mode==='ai'?'OpenAI':mode==='openrouter'?'OpenRouter':'示範模式';
  return <main className="v3-shell">
   <header className="v3-header">
@@ -182,7 +184,13 @@ export default function V3(){
      </button>
     </div>
     <div className="v3-time-controls" aria-label="遊戲時間控制">
-     <div className="v3-time-control-label"><span>◷　推進時間</span><small>時間會影響宗門日常與事件進程</small></div>
+     <div className="v3-time-control-label"><span>◷　遊戲時間</span>
+      <div className="v3-current-clock" role="status" aria-live="polite">
+       <strong>第 {day} 日 · {daypart} {clock}</strong>
+       <small>目前位置：{location}</small>
+      </div>
+      <small>推進時間會影響宗門日常與事件進程</small>
+     </div>
      <div className="v3-time-options">
       {([{minutes:15,label:'15 分鐘'},{minutes:60,label:'1 小時'},
          {minutes:360,label:'6 小時'},{minutes:1440,label:'1 天'}] as const).map(option=>

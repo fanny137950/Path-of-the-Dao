@@ -222,3 +222,9 @@
  .v3-time-options{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
  .v3-shell .v3-time-options button{padding:8px 3px;font-size:10px}
 }
+
+/* Visible game clock adjacent to precise time-skip buttons. */
+.v3-current-clock{display:flex;flex-direction:column;gap:4px;margin:3px 0 4px}
+.v3-current-clock strong{color:#f2e7c8;font-family:"Noto Serif TC",ui-serif,serif;font-size:17px;font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.v3-current-clock small{color:#a9bca8;font-size:11px;line-height:1.5}
+@media(max-width:740px){.v3-current-clock strong{font-size:16px}}
