@@ -14,6 +14,7 @@ export default function V3(){
  const [turn,setTurn]=useState(0);const [usage,setUsage]=useState<number|null>(null);
  const [worldId,setWorldId]=useState('');const [loading,setLoading]=useState(true);const [day,setDay]=useState(1);const [minute,setMinute]=useState(480);
  const bottom=useRef<HTMLDivElement>(null);
+ const initializationStarted=useRef(false);
  function applyWorld(world:WorldView){
   if(!world.id||!Array.isArray(world.messages))throw Error('世界資料格式錯誤');
   setWorldId(world.id);setMessages(world.messages);setTurn(world.revision);
@@ -28,6 +29,8 @@ export default function V3(){
   applyWorld(data);
  }
  useEffect(()=>{
+  if(initializationStarted.current)return;
+  initializationStarted.current=true;
   let active=true;
   (async()=>{try{
    const id=localStorage.getItem(worldKey);
@@ -39,7 +42,7 @@ export default function V3(){
    }else if(active)await createWorld();
   }catch(e){if(active)setError(e instanceof Error?e.message:'讀取世界失敗')}
   finally{if(active)setLoading(false)}})();
-  return()=>{active=false};
+  // The initialization guard prevents duplicate worlds in React Strict Mode.
  },[]);
  useEffect(()=>{bottom.current?.scrollIntoView({behavior:'smooth'})},[messages]);
  async function reset(){
