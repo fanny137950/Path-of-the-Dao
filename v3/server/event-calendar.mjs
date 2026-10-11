@@ -5,6 +5,7 @@
  * Planning is not narration: scheduled future beats are never facts until
  * game-time reaches them, and even then NPC knowledge stays witness-scoped.
  */
+import {seedRecurringEvents,eventSourceCategory} from './event-templates.mjs';
 const DAY=1440;
 const integer=x=>Number.isInteger(x)&&x>=0;
 const stamp=m=>'第'+(Math.floor(m/DAY)+1)+'日 '+String(Math.floor(m%DAY/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
@@ -27,8 +28,10 @@ const SEED=Object.freeze([
   ]},
 ]);
 export function initialEventCalendar(){
- return {version:1,epoch:'大周曆·收徒大典首日（第1日）',
-  events:SEED.map(e=>({...copy(e),state:'scheduled',completed:[],createdAt:480,source:'宗門預定日程'}))};
+ const calendar={version:2,epoch:'大周曆·收徒大典首日（第1日）',
+  events:SEED.map(e=>({...copy(e),state:'scheduled',completed:[],createdAt:480,source:'宗門預定日程',origin:'builtin'}))};
+ seedRecurringEvents(calendar,480,480);
+ return calendar;
 }
 export function validateScheduledEvent(event,world,now){
  if(!event||typeof event!=='object'||Array.isArray(event))throw Error('事件排程格式無效');
@@ -54,7 +57,7 @@ export function validateScheduledEvent(event,world,now){
  return {id,name:name.trim(),type,location:location.trim(),start,end,
   participants:[...new Set(participants)],public:event.public===true,
   stages:stages.map(s=>({id:s.id,at:s.at,title:s.title.trim(),detail:s.detail.trim()})),
-  state:'scheduled',completed:[],createdAt:now,source:'GM新事件排程'};
+  state:'scheduled',completed:[],createdAt:now,source:'GM新事件排程',origin:'ai'};
 }
 export function addScheduledEvent(world,proposal,now){
  world.eventCalendar??=initialEventCalendar();
@@ -75,12 +78,14 @@ export function ensureEventCalendar(world){
    event.state=now>=event.end?'completed':now>=event.start?'active':'scheduled';
   }
  }
+ seedRecurringEvents(world.eventCalendar,(world.day-1)*DAY+world.minute,(world.day-1)*DAY+world.minute);
  return world.eventCalendar;
 }
 /** Advance planned milestones. Emits private timeline events for accountability,
  * not player-visible facts; only corresponding witnesses learn them. */
 export function advanceEventCalendar(world,from,to){
  const calendar=ensureEventCalendar(world),made=[];
+ seedRecurringEvents(calendar,from,to);
  for(const e of calendar.events){
   if(e.state==='completed'||e.state==='cancelled')continue;
   for(const stage of e.stages){
@@ -114,7 +119,7 @@ export function eventCalendarForGM(world,limit=1700){
  const lines=events.filter(e=>e.state!=='completed'||e.end>=now-2*DAY).map(e=>{
   const upcoming=e.stages.filter(s=>!e.completed.includes(s.id)).slice(0,3);
   const happened=e.stages.filter(s=>e.completed.includes(s.id)).slice(-2);
-  return '【'+e.name+'／'+e.type+'／'+e.state+'】地點'+e.location+
+  return '【'+e.name+'／'+eventSourceCategory(e)+'／'+e.type+'／'+e.state+'】地點'+e.location+
    '；開始'+stamp(e.start)+'；結束'+stamp(e.end)+'；'+
    '已到時點：'+(happened.map(s=>stamp(s.at)+' '+s.title).join('、')||'無')+'；'+
    '後續排程（尚未發生）：'+(upcoming.map(s=>stamp(s.at)+' '+s.title).join('、')||'無')+
