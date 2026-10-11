@@ -40,3 +40,23 @@ test('long scenes preserve the newest turn plus latest input and world facts',()
  assert.equal(copy.messages.length,w.messages.length);
  assert.equal(copy.events.length,w.events.length);
 });
+
+test('closing a conversation is contextual pacing, not automatically player speech',()=>{
+ const w=initialV3World('close-exchange');
+ assert.match(currentTurnDirective(w,'就這樣'),/結束這段交流/);
+ assert.match(currentTurnDirective(w,'我說：「就這樣。」'),/自然對話/);
+ assert.match(GM_INSTRUCTIONS,/suggestions/);
+ assert.match(GM_INSTRUCTIONS,/不要僅增加氣氛/);
+});
+
+test('completed assessment notes remain in GM context after long dialogue',()=>{
+ let w=initialV3World('assessment-progress');
+ const narration='韓守一將初評結果記錄完畢。';
+ w=commitV3Turn(w,'繼續',narration+'<!--GM_STATE:'+JSON.stringify({taskUpdates:[{
+  id:'twelve-peaks-selection',status:'取得進展',note:'初評已完成，等待接引代表回覆拜師意願',evidence:narration
+ }]})+'-->','assessment');
+ for(let i=0;i<10;i++)w=commitV3Turn(w,'聊聊'+i,'韓守一說明場區的往事。'.repeat(50),'chat'+i);
+ const ctx=gmContext(validatedWorld(JSON.parse(JSON.stringify(w))),'繼續');
+ assert.match(ctx,/初評已完成，等待接引代表回覆拜師意願/);
+ assert.ok(ctx.length<=11800);
+});

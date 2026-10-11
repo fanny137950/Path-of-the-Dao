@@ -5,7 +5,7 @@ import {pendingRootResult,rootResultConfirmed} from './action-rules.mjs';
 import {WORLD_BIBLE,CANON_LOCATIONS,WORLD_BIBLE_VERSION} from './world-bible.mjs';
 import {CHARACTER_BIBLE} from './character-bible.mjs';
 import {loreForGM,npcPortraitForGM} from './lore-retrieval.mjs';
-import {suggestedActions} from './action-suggestions.mjs';
+import {suggestedActions,validateSuggestions} from './action-suggestions.mjs';
 import {playerQuestJournal} from './player-journal.mjs';
 import {sceneConversationForGM,episodicMemoriesForGM} from './conversation-memory.mjs';
 import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory} from './durable-memory.mjs';
@@ -169,6 +169,7 @@ export function gmContext(world,userText){
   sceneConversationForGM(world,userText,5700),
   '【洛河最新輸入】'+userText,
   rootRule,
+  '【已記錄的當前任務進展：已發生的步驟不可重演】\n'+(world.eventCalendar?.events||[]).filter(e=>e.location===world.location).flatMap(e=>(e.progressLog||[]).slice(-3).map(p=>e.name+'：'+p.status+'；'+p.note)).join('\n').slice(-750),
   '【GM主動性】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
  ].filter(Boolean);
  const optional=[
@@ -199,16 +200,16 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[]};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[]};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[];
- try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
+ let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[];
+ try{const parsed=JSON.parse(match[1]);suggestions=validateSuggestions(parsed.suggestions,narration);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
   if(parsed.move&&typeof parsed.move==='object')move=parsed.move;
   if(Array.isArray(parsed.schedules))schedules=parsed.schedules.slice(0,2);
   if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);
   if(Array.isArray(parsed.taskUpdates))taskUpdates=parsed.taskUpdates.slice(0,5);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions};
 }
 function applyChanges(next,changes,text,narration,present){
  const evidenceText=text+'\n'+narration;
@@ -288,7 +289,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  const eventId='turn:'+next.revision;
  const registration=registerNamedNPCs(next,parsed.narration,parsed.newNPCs);
  const seenBy=privacyHint(userText)?[]:[...new Set([...present,...registration.mentioned])];
- next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration});
+ next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration,suggestions:parsed.suggestions});
  next.events.push({requestId,id:eventId,revision:next.revision,day:next.day,minute:next.minute,
   type:'conversation',text:userText,reply:parsed.narration,location:world.location,
   ...(requestedMinutes?{advanceMinutes:requestedMinutes}:{}),

@@ -17,7 +17,7 @@ test('tested-root scene must progress working NPCs without starting future peak 
  w=commitV3Turn(w,'很強嗎','韓守一解釋靈根品級，最後問你還有什麼疑問嗎？','quality-1');
  const guidance=nextBeatDirective(w,'繼續');
  assert.match(guidance,/已測靈根/);
- assert.match(guidance,/韓守一繼續處理下一份名冊/);
+ assert.match(guidance,/不固定退回登記或測試流程/);
  assert.match(guidance,/尚未到點/);
  assert.match(guidance,/第1日 12:00/);
  assert.match(gmContext(w,'繼續'),/金靈根/);

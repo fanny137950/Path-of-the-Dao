@@ -9,14 +9,13 @@ test('post-test shortcuts must not repeat old result or next-step questions',()=
  world.messages.push({role:'assistant',content:'韓守一說：「測試結果已記錄。下一步要整理名冊。」'});
  const suggestions=suggestedActions(world);
  assert.ok(!suggestions.some(s=>/(?:詢問測試結果|詢問接下來的安排|先觀察四周)/.test(s.label)));
- assert.ok(suggestions.some(s=>s.kind==='advance'));
- assert.equal(suggestions.length,1);
+ assert.deepEqual(suggestions,[]);
 });
 
-test('contextual shortcuts only match current scene and must not repeat recent exact action',()=>{
+test('old scene keywords do not create suggestions without GM metadata',()=>{
  const world=initialV3World('actions-object');
  world.messages.push({role:'assistant',content:'韓守一指向測靈石：「把手按在這裡。」'});
- assert.ok(suggestedActions(world).some(s=>s.label==='將手放上測靈石'));
+ assert.deepEqual(suggestedActions(world),[]);
  const used='我將手掌按在測靈石上，接受測試。';
  world.messages.push({role:'user',content:used});
  assert.ok(!suggestedActions(world).some(s=>s.text===used));
@@ -24,13 +23,13 @@ test('contextual shortcuts only match current scene and must not repeat recent e
  assert.ok(!suggestedActions(world).some(s=>s.label==='將手放上測靈石'));
 });
 
-test('selection shortcut is based on real active calendar, never future-only plan',()=>{
+test('an active calendar does not manufacture selection shortcuts',()=>{
  const world=initialV3World('actions-calendar');
  world.protagonist.spiritualRoot='純風靈根';
  world.messages.push({role:'assistant',content:'各峰代表正在名冊旁進行初選。'});
  assert.ok(!suggestedActions(world).some(s=>s.label==='觀察各峰代表'));
  world.eventCalendar.events.find(e=>e.id==='twelve-peaks-selection').state='active';
- assert.ok(suggestedActions(world).some(s=>s.label==='觀察各峰代表'));
+ assert.deepEqual(suggestedActions(world),[]);
 });
 
 test('developer data includes full GM task data without leaking to the player',()=>{
