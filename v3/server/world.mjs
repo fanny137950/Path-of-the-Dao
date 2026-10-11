@@ -6,6 +6,7 @@ import {WORLD_BIBLE,CANON_LOCATIONS,WORLD_BIBLE_VERSION} from './world-bible.mjs
 import {CHARACTER_BIBLE} from './character-bible.mjs';
 import {loreForGM,npcPortraitForGM} from './lore-retrieval.mjs';
 import {suggestedActions} from './action-suggestions.mjs';
+import {playerQuestJournal} from './player-journal.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -80,7 +81,7 @@ export function playerWorld(world){
    ?{...m,content:isNonNarrative(m.content)
       ?'（先前免費模型的回應無效，已排除在遊戲劇情之外。）'
       :visibleNarrative(m.content)}:m),
-  phase:'freeform',choices:[],suggestions:suggestedActions(world)};
+  phase:'freeform',choices:[],suggestions:suggestedActions(world),journal:playerQuestJournal(world)};
 }
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
@@ -184,7 +185,7 @@ function applyChanges(next,changes,text,narration,present){
   }
  }
 }
-export function commitV3Turn(world,userText,rawAnswer,requestId){
+export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  if(typeof userText!=='string'||!userText.trim()||userText.length>2500)throw Error('玩家輸入無效');
  if(typeof rawAnswer!=='string'||!rawAnswer.trim()||rawAnswer.length>12000)throw Error('GM 回覆無效');
  requireNarrative(rawAnswer);
@@ -199,7 +200,9 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
   parsed.narration.includes(move.evidence)&&/(抵達|到達|來到|走進|進入)/.test(move.evidence)&&
   !/(尚未|未能|無法|不能|沒能|不准)/.test(move.evidence);
  next.revision++;
- const delta=approvedMove?Math.max(30,timeCost(userText)):timeCost(userText);
+ const requestedMinutes=options.advanceMinutes;
+ if(requestedMinutes!==undefined&&![15,60,360,1440].includes(requestedMinutes))throw Error('不支援的時間推進幅度');
+ const delta=requestedMinutes??(approvedMove?Math.max(30,timeCost(userText)):timeCost(userText));
  const after=before+delta;
  next.day=Math.floor(after/1440)+1;
  next.minute=after%1440;
@@ -213,6 +216,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
  next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration});
  next.events.push({requestId,id:eventId,revision:next.revision,day:next.day,minute:next.minute,
   type:'conversation',text:userText,reply:parsed.narration,location:world.location,
+  ...(requestedMinutes?{advanceMinutes:requestedMinutes}:{}),
   root:root||null,destination:approvedMove?move.to:null,witnesses:seenBy});
  for(const id of seenBy){
   const actor=next.npcs[id];
