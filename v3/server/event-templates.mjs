@@ -57,7 +57,7 @@ export function seedRecurringEvents(calendar,from,to){
   // Initial recruitment already has legacy dedicated events. Seed from year 4.
   const minimum=template.id==='recruitment-cycle'?1:0;
   const first=Math.max(minimum,Math.floor((from-template.anchor)/stride)-1);
-  const last=Math.min(first+90,Math.max(minimum,Math.ceil((to-template.anchor)/stride)+1));
+  const last=Math.min(first+90,Math.max(minimum,Math.floor((to-template.anchor)/stride)+1));
   for(let i=first;i<=last;i++){
    if(i<minimum)continue;
    const ev=templateEvent(template,i);
