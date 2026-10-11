@@ -1,41 +1,26 @@
-# 問道九州 · AI Living World
+# 問道九州 · AI Living World (V3)
 
-讓玩家生活在一個不以自己為中心、卻會記住自己存在的世界。
+《問道九州》是自由輸入的 AI 修仙文字 RPG：玩家只控制洛河，AI GM 自然主持 NPC、世界事件、行動判定與因果；人物和任務資料負責**記錄**既成事實，不用固定選項或規則模擬器主導對話。
 
-目前主版本是**場景式 AI 對話實驗場 V2**：全畫面場景、多人短段落互動、玩家主導重要決定、持久化原文與事件、NPC 日程、六處地圖、尋人輔助、世界線分支及開發者人格檢視。舊行走實驗保留在 `/legacy`，不是主版本。
+## 目前架構
 
-## 技術與資料
+- **主遊戲入口**：`/`（指向 `/v3`）；V1、V2 的舊遊戲入口、API、模擬器和舊素材已從開發分支清理。
+- **玩家介面**：`app/v3/page.tsx`、`app/v3/v3.css`。
+- **主要 API**：`app/api/v3/world/route.ts`；透過 `app/chatgpt-auth.ts` 的原有 Sites 登入及 Cloudflare D1 世界存檔。
+- **AI 連接**：`v3/server/openai.mjs`、`v3/server/openrouter.mjs`。
+- **GM 主持規則**：`v3/server/gm-prompt.mjs`，以《通用 AI 角色扮演引擎｜統一模板 v1.0》為基礎；最近完整對話優先。
+- **世界狀態及紀錄**：`v3/server/world.mjs`、`v3/server/conversation-memory.mjs`、`v3/server/event-calendar.mjs`、`v3/server/npc-registration.mjs`。AI 產生敘事及可選的 `GM_STATE` 人物／任務變化欄位，後端驗證後才提交。
+- **開發者後台**：`components/v3-developer-panel.tsx` 與 `components/v3-task-developer-panel.tsx`。
 
-- React / Vinext 客戶端，Cloudflare Workers API，D1 SQLite 持久化資料庫。
-- `components/story-game.tsx`：主介面；`components/developer-panel.tsx`：開發者面板。
-- `lib/story/scene.mjs`：場景回應；`world.mjs`：世界結算；`personality.mjs`：可追溯個性。
-- `app/api/story/route.ts`：帳號與世界線隔離、回合租約、原子提交。
-- `data/`：世界、NPC 原生人格、場景物件與美術映射。
-- `public/art/`：重用人物與場景圖片；`docs/ART-V2.md`：生成來源與用途。
-- `db/schema.ts`、`drizzle/`：實際部署的資料表及遷移。
-- PostgreSQL / Godot 是未來架構方向；本版本沒有假裝使用它們。`docs/target-schema.sql` 是設計稿，不是正式遷移。
+## 開發與測試
 
-## 開發與驗證
-
-需要 Node.js 22.13+、Python 3，以及套件鎖檔所指定的依賴。依專案 `scripts/install-pnpm.sh` 安裝；`npm run build` 建置。Sites 開發環境應優先使用其安裝及建置 helper。
+建議 Node.js 22.13 以上；依專案 pnpm 鎖檔安裝。
 
 ```sh
-node --test tests/*.test.mjs
-python tests/database_test.py
-python tests/story_database_test.py
+node --test v3/tests/*.test.mjs
+npm run build
 ```
 
-正式運作需要 D1 `DB` binding 及可信登入身份。AI Provider 可選 OpenAI、Anthropic、Gemini；玩家在設定輸入模型 ID 與工作階段金鑰。金鑰不寫進存檔、瀏覽器儲存或事件。開發者權限由伺服器 `GAME_DEVELOPER_USER_IDS` 設定，不是前端開關。
+既有玩家 D1 存檔、登入、NPC 原生設定及任務日曆仍保留。GitHub 開發分支的程式清理**不會直接刪除雲端資料庫中的舊世界紀錄**。正式站也不隨程式合併而自動更新。
 
-離開 Sites 部署時，必須替換 `app/chatgpt-auth.ts` 中的可信身份整合、配置資料庫並執行遷移；不可直接把帳號識別 HTTP header 當成任意訪客可填的欄位。此儲存庫不是一鍵可用的 GitHub Pages 靜態站。
-
-## 文件
-
-- [獨立 Cloudflare 私人版部署](docs/CLOUDFLARE.md)
-
-- [目前行為、資料流與限制](docs/STORY-V2.md)
-- [GitHub 原始碼交付](docs/GITHUB.md)
-- [前版持久化設計](docs/STORY-V1.md)
-- [長期架構方向](docs/architecture.md)
-
-尚未完成完整戰鬥、經濟、动态AI新人物與新地圖、原生跨平台客戶端、向量檢索。世界以遊戲行為耗時結算，不在關閉網站時按現實時間運轉。
+其他部署設定請參閱 [部署說明](docs/DEPLOYMENT.md)、[V3 狀態](docs/V3-STATUS.md)。
