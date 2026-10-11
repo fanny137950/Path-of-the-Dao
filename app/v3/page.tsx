@@ -57,13 +57,13 @@ export default function V3(){
  }
  async function send(suggestion?:string){
   const value=(suggestion??text).trim();if(!value||busy||loading||!worldId)return;
-  setBusy(true);setError('');setText('');
+  setBusy(true);setError('');if(!suggestion)setText('');
   try{
    const res=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'turn',world:worldId,requestId:crypto.randomUUID(),text:value,mode,model,apiKey:mode!=='demo'?apiKey:undefined})});
    const data=await res.json() as WorldView;
    if(!res.ok)throw Error(data.error||'回合提交失敗');
    applyWorld(data);
-  }catch(e){setText(value);setError(e instanceof Error?e.message:'連線失敗')}
+  }catch(e){if(!suggestion)setText(value);setError(e instanceof Error?e.message:'連線失敗')}
   finally{setBusy(false)}
  }
  return <main className="v3-shell"><header className="v3-header"><div><strong>問道九州 <small>V3 試玩</small></strong><p>太虛宗 · 第 {day} 日 {String(Math.floor(minute/60)).padStart(2,'0')}:{String(minute%60).padStart(2,'0')} · {phase==='test_ready'?'收徒測試':phase==='result_known'?'已測定靈根':phase==='admitted'?'初試通過':phase==='onboarded'?'已領取日課冊':'外門報到'}</p></div><nav><button onClick={()=>setDev(!dev)}>開發者</button><button onClick={()=>setSettings(!settings)}>AI 設定</button><button onClick={reset}>重新開始</button></nav></header>
