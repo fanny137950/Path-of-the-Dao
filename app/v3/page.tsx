@@ -18,8 +18,12 @@ export default function V3(){
  async function send(){const value=text.trim();if(!value||busy)return;setBusy(true);setError('');setText('');
  const next=[...messages,{role:'user' as const,content:value}];setMessages(next);
  try{const res=await fetch('/api/v3/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,model,apiKey:mode==='ai'?apiKey:undefined,messages:next.slice(-20),turn})});
- const data=await res.json();if(!res.ok)throw Error(data.error||'請求失敗');
- setMessages([...next,{role:'assistant',content:data.text}]);setTurn(t=>t+1);setUsage(data.usage?.totalTokens??null);
+ const data:unknown=await res.json();
+ const reply=data&&typeof data==='object'?data as {error?:unknown;text?:unknown;usage?:{totalTokens?:unknown}}:null;
+ if(!res.ok)throw Error(typeof reply?.error==='string'?reply.error:'請求失敗');
+ if(typeof reply?.text!=='string')throw Error('伺服器回應格式錯誤');
+ setMessages([...next,{role:'assistant',content:reply.text}]);setTurn(t=>t+1);
+ setUsage(typeof reply.usage?.totalTokens==='number'?reply.usage.totalTokens:null);
  }catch(e){setMessages(messages);setText(value);setError(e instanceof Error?e.message:'連線失敗')}finally{setBusy(false)}}
  return <main className="v3-shell"><header className="v3-header"><div><strong>問道九州 <small>V3 試玩</small></strong><p>太虛宗 · 入門篇 · 獨立試驗版</p></div><nav><button onClick={()=>setDev(!dev)}>開發者</button><button onClick={()=>setSettings(!settings)}>AI 設定</button><button onClick={reset}>重新開始</button></nav></header>
  {settings&&<section className="v3-panel"><h3>對話模式</h3><label><input type="radio" checked={mode==='demo'} onChange={()=>setMode('demo')}/> 免費示範（規則式回應，非 AI）</label><label><input type="radio" checked={mode==='ai'} onChange={()=>setMode('ai')}/> OpenAI 真實對話（需自行提供 API Key）</label>{mode==='ai'&&<><label>模型 ID <input value={model} onChange={e=>setModel(e.target.value)} maxLength={80}/></label><label>工作階段 API Key <input type="password" autoComplete="off" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-..."/></label><p>Key 僅保存在本頁記憶體，會送至 V3 伺服器轉發給 OpenAI；不會寫入本機存檔。請勿在共用電腦使用。</p></>}</section>}
