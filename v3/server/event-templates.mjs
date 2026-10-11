@@ -62,7 +62,7 @@ export function seedRecurringEvents(calendar,from,to){
    if(i<minimum)continue;
    const ev=templateEvent(template,i);
    // Include currently active as well as future events, but no ancient replay.
-   if(ev.end<=from||ev.start>to+DAY*2||known.has(ev.id))continue;
+   if(ev.end<=from||known.has(ev.id))continue;
    calendar.events.push(ev);known.add(ev.id);count++;
   }
  }
