@@ -3,12 +3,14 @@ import {useEffect,useRef,useState} from 'react';
 import './v3.css';
 import V3DeveloperPanel from '../../components/v3-developer-panel';
 type Msg={role:'user'|'assistant';content:string};
+type SuggestedAction={label:string;text:string;kind?:'action'|'advance'};
 const intro='太虛宗收徒大典，山門前人潮如織。高臺上，負責測試靈根的執事抬起眼。\n\n「下一位。姓名？」\n\n你是十五歲的洛河，今日第一次踏入太虛宗。';
 // New local pointer deliberately starts a fresh V3 test world; old test rows remain untouched.
 const worldKey='wendao-v3-chat-first-world';
-type WorldView={id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;error?:string};
+type WorldView={id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];suggestions?:SuggestedAction[];usage?:{totalTokens?:number}|null;error?:string};
 export default function V3(){
  const [messages,setMessages]=useState<Msg[]>([{role:'assistant',content:intro}]);
+ const [suggestions,setSuggestions]=useState<SuggestedAction[]>([]);
  const [text,setText]=useState('');const [busy,setBusy]=useState(false);
  const [apiKey,setApiKey]=useState('');const [model,setModel]=useState('openrouter/free');
  const [settings,setSettings]=useState(false);const [dev,setDev]=useState(false);
@@ -21,6 +23,7 @@ export default function V3(){
  function applyWorld(world:WorldView){
   if(!world.id||!Array.isArray(world.messages))throw Error('世界資料格式錯誤');
   setWorldId(world.id);setMessages(world.messages);setTurn(world.revision);
+  setSuggestions(Array.isArray(world.suggestions)?world.suggestions.filter(x=>typeof x?.text==='string'&&typeof x?.label==='string').slice(0,4):[]);
   setDay(world.day);setMinute(world.minute);setLocation(world.location||'太虛宗山門');
   setUsage(typeof world.usage?.totalTokens==='number'?world.usage.totalTokens:null);
   localStorage.setItem(worldKey,world.id);
@@ -53,15 +56,15 @@ export default function V3(){
   setLoading(true);setError('');
   try{await createWorld()}catch(e){setError(e instanceof Error?e.message:'建立世界失敗')}finally{setLoading(false)}
  }
- async function send(){
-  const value=text.trim();if(!value||busy||loading||!worldId)return;
+ async function send(quickText?:string){
+  const value=(quickText??text).trim();if(!value||busy||loading||!worldId)return;
   setBusy(true);setError('');setText('');
   try{
    const res=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'turn',world:worldId,requestId:crypto.randomUUID(),text:value,mode,model,apiKey:mode!=='demo'?apiKey:undefined})});
    const data=await res.json() as WorldView;
    if(!res.ok)throw Error(data.error||'回合提交失敗');
    applyWorld(data);
-  }catch(e){setText(value);setError(e instanceof Error?e.message:'連線失敗')}
+  }catch(e){if(quickText===undefined)setText(value);setError(e instanceof Error?e.message:'連線失敗')}
   finally{setBusy(false)}
  }
  const panel=dev?'dev':settings?'settings':'story';
@@ -122,6 +125,20 @@ export default function V3(){
      <div className="v3-label">{m.role==='user'?<><span className="v3-speaker-dot v3-player-dot"></span>洛河</>:<><span className="v3-speaker-dot v3-gm-dot"></span>問道九州 · GM</>}</div>
      <div className="v3-content">{m.content}</div>
     </article>)}
+    {!busy&&!loading&&suggestions.length>0&&<div className="v3-actions" aria-label="情境建議行動">
+     <div className="v3-actions-title">此刻可以…… <span>或自行輸入任何行動</span></div>
+     <div className="v3-actions-buttons">
+      {suggestions.map(action=><button type="button" key={action.text}
+       className={action.kind==='advance'?'v3-action-advance':''}
+       disabled={busy||loading||!worldId||Boolean(text.trim())}
+       title={text.trim()?'輸入框已有文字，請先送出或清空，以免誤觸覆蓋':'點擊後直接作為洛河的下一句輸入'}
+       onClick={()=>void send(action.text)}>
+       {action.kind==='advance'?<span aria-hidden="true">✦</span>:null}
+       {action.label}
+      </button>)}
+     </div>
+     <p className="v3-actions-hint">建議選項只是快捷動作；GM 仍依世界狀態判定結果。選「交給 GM 推進」不會代替洛河做重大決定。</p>
+    </div>}
     {busy&&<div className="v3-thinking" role="status"><span className="v3-thinking-icon">✦</span> GM 正在推演此刻的九州……</div>}
     <div ref={bottom}/>
    </section>
