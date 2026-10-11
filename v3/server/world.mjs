@@ -120,12 +120,20 @@ export function gmContext(world,userText){
  const scene='【客觀世界】第'+world.day+'日 '+Math.floor(world.minute/60)+':' +
   String(world.minute%60).padStart(2,'0')+'，地點'+world.location+'。洛河，'+
   world.protagonist.age+'歲，境界'+world.protagonist.realm+'，靈根'+world.protagonist.spiritualRoot+'。';
- const output=[scene,'【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+
-  '。不在場NPC不能憑空旁聽、瞬移或知道其他人的私密知情。',
-  people,worldPlanForGM(world),chapters,'【相關舊事】\n'+relevantEvents,
-  '【最近對話原文】\n'+recent,'【洛河最新輸入】'+userText,rootRule,
-  '【GM規則】保留對話連續性，不強迫完成任務，不把每輪當成獨立小說開場。世界秘密供你安排因果，但不得讓沒知情的NPC自行道出。玩家說「繼續」時由人物或事件自然推進；不能替洛河做重要決定。'];
- // OpenRouter adapter rejects requests >12,000 characters.
+ const output=[
+  scene.slice(0,500),
+  ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。不在場NPC不能憑空旁聽、瞬移或知道他人的私密知情。').slice(0,220),
+  people.slice(0,1900),
+  worldPlanForGM(world).slice(0,1050),
+  chapters.slice(0,1100),
+  ('【相關舊事】\n'+relevantEvents).slice(0,1250),
+  '【最近對話原文】\n'+recent.slice(-3000),
+  '【洛河最新輸入】'+userText,
+  rootRule,
+  '【GM規則】延續上個回合，不強迫完成任務。NPC各有個性與自己知道的事。玩家說「繼續」時自然推進但不代她決定。'
+ ];
+ // Explicit per-section budgets keep the current player input and latest replies
+ // even in very long games; dropping the END of a long prompt would lose them.
  return output.filter(Boolean).join('\n\n').slice(0,11800);
 }
 const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
