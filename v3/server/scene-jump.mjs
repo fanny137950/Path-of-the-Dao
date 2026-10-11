@@ -5,6 +5,7 @@
 import {elapsedMinutes,advanceLivingWorld} from './living-world.mjs';
 import {advanceEventCalendar} from './event-calendar.mjs';
 import {advanceNPCAgency} from './npc-agency.mjs';
+import {replanNPCAgendas} from './npc-decision-v2.mjs';
 
 export function sceneJumpPlan(world,text){
  const input=String(text||'').trim();
@@ -46,5 +47,6 @@ export function prepareSceneJump(world,plan){
  advanceEventCalendar(working,from,to);
  advanceLivingWorld(working,from,to);
  advanceNPCAgency(working,from,to);
+ replanNPCAgendas(working,from,to);
  return working;
 }

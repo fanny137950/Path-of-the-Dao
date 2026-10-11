@@ -12,6 +12,8 @@ import {stabilizeDecisiveAction} from '../../../../v3/server/outcome-stability.m
 import {nextBeatDirective,assessContinueReply,retryContinueDirective,isContinueIntent} from '../../../../v3/server/gm-initiative.mjs';
 // @ts-ignore - backend scene jump planner
 import {sceneJumpPlan,prepareSceneJump} from '../../../../v3/server/scene-jump.mjs';
+// @ts-ignore - backend narration fact guard
+import {checkWorldFacts,correctionDirective} from '../../../../v3/server/world-fact-guard.mjs';
 
 export const dynamic='force-dynamic';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -142,17 +144,22 @@ export async function POST(request:Request){
    const result=await generate(args.instructions);
    answer=result.text;usage=result.usage;
    const quality=assessContinueReply(text,answer);
-   if(!quality.ok&&isContinueIntent(text)){
+   const facts=checkWorldFacts(actingWorld,answer);
+   if((!quality.ok&&isContinueIntent(text))||!facts.ok){
     // Draft is never saved. Retry only clearly stalled "繼續" turns, at most once.
-    const retry=await generate(args.instructions+retryContinueDirective(quality));
+    const retry=await generate(args.instructions+
+     (!quality.ok&&isContinueIntent(text)?retryContinueDirective(quality):'')+
+     (!facts.ok?correctionDirective(facts):''));
     answer=retry.text;
     usage={totalTokens:(result.usage?.totalTokens||0)+(retry.usage?.totalTokens||0)};
-    if(!assessContinueReply(text,answer).ok){
-     return reply({error:'GM 這回合仍停在重複提問，未寫入存檔。請重試「繼續」，不會消耗遊戲時間。'},502);
+    if((isContinueIntent(text)&&!assessContinueReply(text,answer).ok)||!checkWorldFacts(actingWorld,answer).ok){
+     return reply({error:'GM 回覆未通過敘事一致性檢查，世界與遊戲時間未儲存，請重試。'},502);
     }
    }
   }
   answer=stabilizeDecisiveAction(actingWorld,text,answer);
+  if(mode==='demo'&&!checkWorldFacts(actingWorld,answer).ok)
+   return reply({error:'示範模式回覆不符合世界設定，未儲存。'},502);
   const next=commitV3Turn(actingWorld,text,answer,body.requestId,
    isTimeAdvance?{advanceMinutes:requestedMinutes}:scenePlan?{advanceMinutes:0,sceneJump:{eventId:scenePlan.eventId,minutes:scenePlan.minutes}}:{});
   // Compare-and-swap: no partial turn or lost concurrent update.
