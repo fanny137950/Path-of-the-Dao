@@ -1,2 +1,2 @@
-// V3 is the new default experience. V2 remains available at /v2.
+// V3 is the only supported game experience.
 export {default} from './v3/page';
