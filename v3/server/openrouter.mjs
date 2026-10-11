@@ -51,9 +51,26 @@ export async function generateOpenRouterResponse({
    throw new AIProviderError('OpenRouter 暫時無法提供免費模型，請稍後重試',502);
   }
   let data;
-  try{data=await response.json();}
-  catch{throw new AIProviderError('OpenRouter 回應格式錯誤',502);}
-  const value=data?.choices?.[0]?.message?.content;
+  try{
+   // OpenRouter normally returns JSON for stream:false. Some free providers or
+   // their proxies occasionally send an empty, HTML, or malformed 200 response.
+   // Never store such responses as narrative; retry once with a fresh request.
+   data=await response.json();
+  }catch{
+   if(attempt===0)continue;
+   throw new AIProviderError(
+    'OpenRouter 連續兩次傳回無法讀取的資料（可能是免費模型或上游代理暫時異常）。本回合未存檔，請稍後重試或改選其他 :free 模型。',
+    502
+   );
+  }
+  if(!data||typeof data!=='object'||!Array.isArray(data.choices)){
+   if(attempt===0)continue;
+   throw new AIProviderError(
+    'OpenRouter 連續兩次未傳回標準對話資料。本回合未存檔，請稍後重試或改選其他 :free 模型。',
+    502
+   );
+  }
+  const value=data.choices?.[0]?.message?.content;
   const text=typeof value==='string'?value:
    Array.isArray(value)?value.filter(p=>p?.type==='text')
     .map(p=>typeof p.text==='string'?p.text:'').join(''):'';
