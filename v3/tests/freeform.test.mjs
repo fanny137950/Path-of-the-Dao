@@ -40,7 +40,7 @@ test('quiet offscreen world arc advances when player passes time, with private N
  const world=initialV3World('offscreen');
  const next=commitV3Turn(world,'我等到晚上','洛河在山門等到晚霞落盡。','wait');
  assert.equal(next.minute,1080);
- const scenes=next.events.filter(e=>e.type==='offscreen');
+ const scenes=next.events.filter(e=>e.type==='offscreen'&&e.source==='living-world');
  assert.equal(scenes.length,3);
  assert.deepEqual(scenes.map(e=>e.text),[
   '收徒執事發現名冊號碼對不上，暫未公布',

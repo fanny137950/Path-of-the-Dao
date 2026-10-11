@@ -9,6 +9,7 @@ import {suggestedActions} from './action-suggestions.mjs';
 import {playerQuestJournal} from './player-journal.mjs';
 import {sceneConversationForGM,episodicMemoriesForGM} from './conversation-memory.mjs';
 import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory} from './durable-memory.mjs';
+import {initialEventCalendar,ensureEventCalendar,addScheduledEvent,advanceEventCalendar,eventCalendarForGM} from './event-calendar.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -42,7 +43,7 @@ export function initialV3World(id){
    family:clone(WORLD_BIBLE.protagonist.family),
    aptitude:{grade:'未知',description:'尚未完成靈根與資質測試；不能僅因往昔世界線直接認定。'},
    realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
+  npcs:clone(NPCS),eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
 }
 export function validatedWorld(value){
  if(!value||value.mode!=='v3'||!Array.isArray(value.messages)||!Array.isArray(value.events)
@@ -55,6 +56,7 @@ export function validatedWorld(value){
  value.protagonist.family??=clone(WORLD_BIBLE.protagonist.family);
  value.protagonist.aptitude??={grade:'未知',description:'尚未完成完整資質評估'};
  value.living??=initialLivingWorld();
+ ensureEventCalendar(value);
  hydrateDurableMemory(value);
  value.scene??=sceneOf(value);
  value.developerAudit??=[];
@@ -140,7 +142,8 @@ export function gmContext(world,userText){
   ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。不在場NPC不能憑空旁聽、瞬移或知道他人的私密知情。').slice(0,220),
   loreForGM(world,userText,2050),
   people.slice(0,2300),
-  worldPlanForGM(world).slice(0,680),
+  worldPlanForGM(world).slice(0,550),
+  eventCalendarForGM(world,1300),
   ('【長期重要經歷（依存檔原話，不代表每個NPC都知情）】\n'+durable).slice(0,1300),
   chapters.slice(0,280),
   episodicMemoriesForGM(world,userText,1100),
@@ -166,13 +169,14 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[]};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null;
+ let changes=[],move=null,schedules=[];
  try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
-  if(parsed.move&&typeof parsed.move==='object')move=parsed.move;}
+  if(parsed.move&&typeof parsed.move==='object')move=parsed.move;
+  if(Array.isArray(parsed.schedules))schedules=parsed.schedules.slice(0,2);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules};
 }
 function applyChanges(next,changes,text,narration,present){
  const evidenceText=text+'\n'+narration;
@@ -231,6 +235,12 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
    source:'現場',text:shorten('洛河：'+userText+'；當時：'+parsed.narration,420)});
  }
  applyChanges(next,parsed.changes,userText,parsed.narration,present);
+ // Only valid complete plans become authoritative. Rejected suggestions cannot
+ // rewrite existing calendar events or invalidate an otherwise valid dialogue.
+ for(const proposal of parsed.schedules){
+  try{addScheduledEvent(next,proposal,before);}catch{/* Unscheduled plans are never canonical. */}
+ }
+ advanceEventCalendar(next,before,after);
  updateDurableMemory(next,next.events.find(e=>e.id===eventId));
  advanceLivingWorld(next,before,after);
  maybeWriteChapter(next);
