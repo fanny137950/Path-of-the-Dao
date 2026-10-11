@@ -13,9 +13,11 @@ type Character={
  relationships:{player:{favor:number;trust:number;respect:number;impression?:string}};
  memories:Memory[];privateNotes:string[];knowledge:string[];
 };
+type NPCAgenda={id:string;actorId:string;title:string;location:string;start:number;end:number;phase:string;goal:string;status:string;cause:string;summary?:string};
 type DeveloperData={
  revision:number;world:string;day:number;minute:number;location:string;
  characters:Record<string,Character>;bibleVersion?:number;
+ npcAgency?:{lastAdvancedAt:number;agendas:Record<string,NPCAgenda>;history:{id:string;actorId:string;at:number;title:string;location:string}[]};
  protagonist?:{name:string;age:number;gender?:string;hometown?:string;realm:string;spiritualRoot:string;aptitude?:{grade:string;description:string};family?:string[]};
  worldBible?:{title:string;sect?:{recruitment:{steps:string[]};peaks:{name:string;domain:string;leader:string;source:string}[]};
   cultivation?:{realmOrder:string[];hardRules:string[]};factions?:{name:string;region:string;stance:string}[]};
@@ -148,6 +150,15 @@ export default function V3DeveloperPanel({
    <div className="v3-dev-details">
     {!actor||!draft?<p>請選擇人物。</p>:<>
      <h4>{actor.name} <span className="v3-dev-muted">#{actor.id}</span></h4>
+     {data.npcAgency?.agendas[actor.id]&&<div className="v3-dev-dossier" style={{padding:'12px 16px',marginBottom:16}}>
+      <strong>NPC 自主行動 · 當前日程</strong>
+      <p><strong>目前工作：</strong>{data.npcAgency.agendas[actor.id].title}</p>
+      <p><strong>所在位置：</strong>{data.npcAgency.agendas[actor.id].location} · <strong>行動狀態：</strong>{data.npcAgency.agendas[actor.id].status}</p>
+      <p><strong>開始時間：</strong>第 {Math.floor(data.npcAgency.agendas[actor.id].start/1440)+1} 日 {String(Math.floor(data.npcAgency.agendas[actor.id].start%1440/60)).padStart(2,'0')}:{String(data.npcAgency.agendas[actor.id].start%60).padStart(2,'0')}</p>
+      <p><strong>預定完成：</strong>第 {Math.floor(data.npcAgency.agendas[actor.id].end/1440)+1} 日 {String(Math.floor(data.npcAgency.agendas[actor.id].end%1440/60)).padStart(2,'0')}:{String(data.npcAgency.agendas[actor.id].end%60).padStart(2,'0')}</p>
+      {data.npcAgency.agendas[actor.id].summary&&<p>{data.npcAgency.agendas[actor.id].summary}</p>}
+      <p>幕後日程是私人 GM 資訊，不能讓洛河或不知情的 NPC 自動得知。</p>
+     </div>}
      <p><strong>人物核心資料與日常狀態</strong> — 資質、境界、靈根及人格分開記錄；新增設定附有來源標註。下方可編輯的欄位不會重寫人物聖經。</p>
      <details className="v3-dev-dossier" open>
       <summary>人物設定與修煉資質</summary>
