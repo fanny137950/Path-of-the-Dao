@@ -4,11 +4,12 @@ import {useEffect,useMemo,useState} from 'react';
 type Stage={id:string;at:number;title:string;detail:string};
 type Schedule={id:string;name:string;type:string;location:string;start:number;end:number;
  participants:string[];public:boolean;state:string;completed:string[];
- stages:Stage[];source?:string;cancelledAt?:number};
+ stages:Stage[];source?:string;origin?:string;templateId?:string;cycle?:number;repeatYears?:number;description?:string;cancelledAt?:number};
 type Arc={id:string;name:string;truth:string;status:string;participants:string[];
  beats:{id:string;at:number;summary:string;witnesses:string[]}[];completed:string[]};
 type DeveloperData={world:string;revision:number;day:number;minute:number;
  eventCalendar:{epoch:string;events:Schedule[]};livingArcs:Arc[];
+ eventTemplates?:{id:string;name:string;intervalYears:number;note:string}[];gameYearDays?:number;
  characters:Record<string,{name:string}>;error?:string};
 type WorldView={id:string;revision:number;day:number;minute:number;location:string;
  messages:{role:'user'|'assistant';content:string}[]};
@@ -26,6 +27,7 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false);
  const [error,setError]=useState(''),[notice,setNotice]=useState('');
  const [search,setSearch]=useState(''),[status,setStatus]=useState('全部');
+ const [originFilter,setOriginFilter]=useState('全部來源');
  const [selected,setSelected]=useState<string>('');
  const [createOpen,setCreateOpen]=useState(false);
  const [draft,setDraft]=useState<NewDraft>(()=>makeDraft(480));
@@ -53,7 +55,12 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
    source:'living-world',kind:'arc' as const,truth:a.truth
   }))
  ],[events,data?.livingArcs,data?.characters]);
- const filtered=all.filter(e=>(status==='全部'||e.state===status)&&
+ const sourceLabel=(e:typeof all[number])=>e.kind==='arc'?'幕後事件':
+  e.origin==='builtin'||e.source==='宗門預定日程'||e.source==='預設任務'?'預設任務':
+  e.origin==='ai'||e.source==='GM新事件排程'?'AI 新增任務':
+  e.origin==='developer'||e.source==='開發者新增任務'?'開發者任務':'其他事件';
+ const filtered=all.filter(e=>(originFilter==='全部來源'||sourceLabel(e)===originFilter)&&
+  (status==='全部'||e.state===status)&&
   (!search.trim()||(e.name+' '+e.id+' '+e.type+' '+e.location).includes(search.trim())));
  const active=all.find(e=>e.id===selected)||filtered[0];
  const now=data?(data.day-1)*1440+data.minute:480;
@@ -97,6 +104,11 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {notice&&<p className="v3-success">{notice}</p>}
   {data&&<>
+   <div className="v3-dev-dossier v3-task-templates">
+    <strong>世界預設週期活動（{data.eventTemplates?.length??0} 類）</strong>
+    <p>遊戲年暫訂 {data.gameYearDays??365} 日。收徒三年一次；論道、出峰歷練每年有固定活動窗口。玩家不參加也不會停止日程。</p>
+    {data.eventTemplates?.map(template=><p key={template.id}><strong>{template.name}</strong> · 每 {template.intervalYears} 年一次 · {template.note}</p>)}
+   </div>
    <div className="v3-task-overview">
     <div><small>目前遊戲時間</small><strong>{stamp(now)}</strong></div>
     <div><small>排定活動／任務</small><strong>{events.length}</strong></div>
@@ -105,6 +117,9 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
    </div>
    <div className="v3-task-toolbar">
     <input type="search" aria-label="搜尋任務" placeholder="搜尋任務名稱、地點或 ID" value={search} onChange={e=>setSearch(e.target.value)}/>
+    <select aria-label="依任務來源篩選" value={originFilter} onChange={e=>setOriginFilter(e.target.value)}>
+     {['全部來源','預設任務','AI 新增任務','開發者任務','幕後事件'].map(x=><option key={x}>{x}</option>)}
+    </select>
     <select aria-label="依任務狀態篩選" value={status} onChange={e=>setStatus(e.target.value)}>
      {['全部','scheduled','active','completed','cancelled','未開始','進行中','已解決'].map(x=><option key={x} value={x}>{x==='scheduled'?'未開始':x==='active'?'進行中':x==='completed'?'已結束':x==='cancelled'?'已取消':x}</option>)}
     </select>
@@ -135,14 +150,16 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
       filtered.map(e=><button type="button" key={e.id} aria-pressed={active?.id===e.id}
        className={active?.id===e.id?'v3-dev-active':''} onClick={()=>setSelected(e.id)}>
        <strong>{e.name}</strong>
-       <small>{e.type} · {e.state} · {e.stages.filter(s=>e.completed.includes(s.id)).length}/{e.stages.length} 階段</small>
+       <small>{sourceLabel(e)} · {e.state} · {e.stages.filter(s=>e.completed.includes(s.id)).length}/{e.stages.length} 階段</small>
        <small>{stamp(e.start)} → {stamp(e.end)}</small>
       </button>)}
     </aside>
     <div className="v3-task-detail">
      {!active?<p>請選擇一個任務或事件。</p>:<>
       <h4>{active.name}</h4>
-      <p className="v3-dev-muted">#{active.id} · {active.type} · {active.state}</p>
+      <p className="v3-dev-muted">#{active.id} · {sourceLabel(active)} · {active.type} · {active.state}</p>
+      {'repeatYears' in active&&typeof active.repeatYears==='number'&&<p className="v3-dev-muted">每 {active.repeatYears} 年循環 · 第 {active.cycle??1} 期 · 每年暫按 {data.gameYearDays??365} 遊戲日計算</p>}
+      {'description' in active&&active.description&&<p>{active.description}</p>}
       <div className="v3-task-facts">
        <p><strong>所在地：</strong>{active.location}</p>
        <p><strong>開始：</strong>{stamp(active.start)}</p>
@@ -162,7 +179,7 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
         <p>{stage.detail}</p>
        </div>)}
       </div>
-      {active.kind==='scheduled'&&['scheduled','active'].includes(active.state)&&
+      {active.kind==='scheduled'&&sourceLabel(active)!=='預設任務'&&['scheduled','active'].includes(active.state)&&
        <button type="button" className="v3-danger-btn" disabled={saving}
         onClick={()=>{if(confirm('確定取消「'+active.name+'」？會留下稽核紀錄，不刪除歷史。'))void submit('cancel',{id:active.id})}}>
         取消此事件

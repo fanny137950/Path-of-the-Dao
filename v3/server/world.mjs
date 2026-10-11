@@ -10,6 +10,7 @@ import {playerQuestJournal} from './player-journal.mjs';
 import {sceneConversationForGM,episodicMemoriesForGM} from './conversation-memory.mjs';
 import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory} from './durable-memory.mjs';
 import {initialEventCalendar,ensureEventCalendar,addScheduledEvent,advanceEventCalendar,eventCalendarForGM} from './event-calendar.mjs';
+import {BUILTIN_EVENT_TEMPLATES,eventSourceCategory,GAME_YEAR_DAYS} from './event-templates.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -94,6 +95,7 @@ export function developerWorld(world){
   worldBible:clone(WORLD_BIBLE),protagonist:clone(world.protagonist),
   characters:clone(world.npcs),events:clone(world.events.slice(-25)),
   eventCalendar:clone(ensureEventCalendar(world)),
+  eventTemplates:clone(BUILTIN_EVENT_TEMPLATES),gameYearDays:GAME_YEAR_DAYS,
   livingArcs:clone(world.living?.arcs||[]),
   audit:clone((world.developerAudit||[]).slice(-25))};
 }
@@ -302,11 +304,13 @@ export function developerTaskChange(world,action,payload,by='developer'){
  let event;
  if(action==='create'){
   event=addScheduledEvent(next,payload,now);
+  event.source='開發者新增任務';event.origin='developer';
  }else{
   if(typeof payload?.id!=='string')throw Error('任務 ID 無效');
   const entry=ensureEventCalendar(next).events.find(e=>e.id===payload.id);
   if(!entry)throw Error('找不到指定任務');
   if(entry.state==='completed'||entry.state==='cancelled')throw Error('已結束任務不能重複取消');
+  if(eventSourceCategory(entry)==='預設任務')throw Error('預設的宗門週期活動不可直接取消，請調整當期參與或另設變故事件');
   entry.state='cancelled';
   entry.cancelledAt=now;
   event=entry;

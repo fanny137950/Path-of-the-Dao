@@ -36,7 +36,7 @@ test('selection shortcut is based on real active calendar, never future-only pla
 test('developer data includes full GM task data without leaking to the player',()=>{
  const world=initialV3World('task-private');
  const admin=developerWorld(world);
- assert.equal(admin.eventCalendar.events.length,2);
+ assert.ok(admin.eventCalendar.events.length>=2);
  assert.equal(admin.livingArcs[0].truth.includes('抄錄差錯'),true);
  assert.equal(playerWorld(world).eventCalendar,undefined);
  assert.equal(playerWorld(world).livingArcs,undefined);
@@ -48,14 +48,15 @@ test('authorized developer task creation, cancellation, auditing and immutable o
   start:540,end:690,participants:['registrar'],public:false,
   stages:[{id:'begin',at:540,title:'出發',detail:'派出信使'},
    {id:'deadline',at:690,title:'期限截止',detail:'移交其他人員'}]};
+ const count=world.eventCalendar.events.length;
  const next=developerTaskChange(world,'create',draft,'admin');
  assert.equal(next.revision,1);
- assert.equal(world.eventCalendar.events.length,2);
- assert.equal(next.eventCalendar.events[2].name,'山門信使任務');
+ assert.equal(world.eventCalendar.events.length,count);
+ assert.equal(next.eventCalendar.events.find(e=>e.id===draft.id).name,'山門信使任務');
  assert.equal(next.developerAudit.at(-1).operation,'task-create');
  const canceled=developerTaskChange(next,'cancel',{id:'dev-custom-001'},'admin');
- assert.equal(canceled.eventCalendar.events[2].state,'cancelled');
- assert.equal(canceled.eventCalendar.events[2].cancelledAt,480);
+ assert.equal(canceled.eventCalendar.events.find(e=>e.id===draft.id).state,'cancelled');
+ assert.equal(canceled.eventCalendar.events.find(e=>e.id===draft.id).cancelledAt,480);
  assert.equal(canceled.developerAudit.at(-1).operation,'task-cancel');
  assert.throws(()=>developerTaskChange(canceled,'cancel',{id:'dev-custom-001'}),/不能重複/);
  assert.throws(()=>developerTaskChange(world,'create',{...draft,end:530},'admin'),/時間/);
@@ -64,7 +65,9 @@ test('authorized developer task creation, cancellation, auditing and immutable o
 
 test('already canceled event must not emit future stages',()=>{
  let world=initialV3World('task-canceled');
- world=developerTaskChange(world,'cancel',{id:'twelve-peaks-selection'},'admin');
+ const draft={id:'cancel-once-001',name:'臨時委託',type:'任務',location:'太虛宗山門',start:600,end:900,participants:[],stages:[{id:'open',at:600,title:'開始',detail:'開始'},{id:'end',at:900,title:'結束',detail:'結束'}]};
+ world=developerTaskChange(world,'create',draft,'admin');
+ world=developerTaskChange(world,'cancel',{id:'cancel-once-001'},'admin');
  const after=commitV3Turn(world,'原地等一天','山門照常開放。','task-wait',{advanceMinutes:1440});
- assert.equal(after.events.filter(e=>e.id?.startsWith('calendar:twelve-peaks-selection:')).length,0);
+ assert.equal(after.events.filter(e=>e.id?.startsWith('calendar:cancel-once-001:')).length,0);
 });
