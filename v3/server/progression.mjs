@@ -5,7 +5,7 @@
  */
 export const PHASES=Object.freeze({
  test_ready:'等待測靈根',result_known:'靈根已測定',
- admitted:'初試通過',outer_checkin:'外門報到',
+ admitted:'初試通過',outer_checkin:'外門報到',onboarded:'已領取新生安排',
 });
 const ROOTS=Object.freeze([
  '風靈根','水木雙靈根','火靈根','土靈根',
@@ -47,6 +47,11 @@ function acceptsToken(text){
  return /(?:收下|接過|領取|領到|拿起|拿了|收起).{0,12}(?:木牌|報到牌|名牌|牌子)/.test(text)||
   /(?:木牌|報到牌|名牌|牌子).{0,8}(?:接過|收下|領取)/.test(text);
 }
+function checksIn(text){
+ if(/(?:不交|不給|先不|暫時不|不想|拒絕)/.test(text))return false;
+ return /(?:報到|登記|交給|遞給|交出|出示).{0,18}(?:木牌|接引弟子|新弟子|住處|報到)/.test(text)||
+  /(?:木牌|報到牌).{0,8}(?:交給|遞給|出示)/.test(text);
+}
 function goesToOuter(text){
  if(/(?:不去|不要去|不前往|暫時不)/.test(text))return false;
  return /(?:前往|去|走向|走到|抵達|到|報到|進入).{0,10}(?:外門報到處|外門報到|報到處)/.test(text)||
@@ -62,6 +67,10 @@ export function prepareProgress(world,playerText){
  if(phase==='result_known'&&acceptsToken(text)){
   return {from:phase,to:'admitted',kind:'token-accepted',
    cutscene:'洛河接過木牌，溫潤的木面刻著太虛宗雲紋，背面還有外門報到處的位置。\n\n韓守一在名冊上勾去一行。「初試登記完成。接下來去外門報到處領住處與日課安排。若有疑問，也可以問那邊的接引弟子。」\n\n這一輪收徒測試告一段落，前方山道已開放新弟子通行。'};
+ }
+ if(phase==='outer_checkin'&&checksIn(text)){
+  return {from:phase,to:'onboarded',kind:'onboarding-complete',
+   cutscene:'許秋雁接過木牌，核對名字，在新生名冊上蓋下一枚青色印記。\n\n「洛河，登記好了。你暫時編在外門新生班，這是居所牌與三日的入門日課。明早辰時去演武場集合。」\n\n她將一本薄薄的日課冊推過來，側身讓出桌邊的位置。後方有幾個新弟子正低聲討論明日的第一堂課。'};
  }
  if(phase==='admitted'&&goesToOuter(text)){
   return {from:phase,to:'outer_checkin',kind:'outer-arrival',toLocation:'外門報到處',
@@ -100,6 +109,11 @@ const actions={
   {id:'daily',label:'詢問修煉日課',text:'我問接引弟子：新弟子每天要做哪些修煉？'},
   {id:'peers',label:'與同屆弟子交談',text:'我走向旁邊的新弟子，問她是哪裡來的。'},
  ],
+ onboarded:[
+  {id:'classes',label:'閱讀入門日課',text:'我翻開剛領到的日課冊，仔細看明天要練什麼。'},
+  {id:'training',label:'前往演武場看看',text:'我照著日課冊指引，前往演武場看一看。'},
+  {id:'friends',label:'認識同屆弟子',text:'我走向旁邊的新弟子，問她明天也要去晨課嗎？'},
+ ],
 };
 export function suggestedActions(world){
  const progress=progressOf(world);
@@ -111,12 +125,14 @@ export function progressFacts(world,playerText){
  const p=prepareProgress(world,playerText),phase=progressOf(world).phase;
  const official=p.root?'本回合玩家正在實際觸摸測靈石，測得結果固定為「'+p.root+'」，不可改成其他靈根。':
   p.kind==='token-accepted'?'本回合洛河正式收下報到木牌，完成入門初試；不要再要求她回答姓名或重新測試。':
-  p.kind==='outer-arrival'?'本回合洛河已抵達外門報到處，應開始外門日課／住處登記；現場有接引弟子。':'';
+  p.kind==='outer-arrival'?'本回合洛河已抵達外門報到處，應開始外門日課／住處登記；現場有接引弟子。':
+  p.kind==='onboarding-complete'?'本回合已完成外門報到、得到居所牌及日課冊，不必再填基本資料。':'';
  const scene={
   test_ready:'名冊已寫明：洛河，十五歲。韓守一右手邊的桌上放著測靈石，大小如盤，無需再問姓名或年齡。玩家可以直接按石測試，也可以詢問或觀察。',
   result_known:'測試已完成，靈根是「'+world.protagonist.spiritualRoot+'」。韓守一已提供報到木牌，下一步是收下木牌或追問測試結果。嚴禁再把靈根說成未知。',
   admitted:'初試已合格並領木牌，下一步可前往外門報到處、認識新弟子或打聽宗門。不要再回到測試流程。',
-  outer_checkin:'已到外門報到處，接引弟子在場，可安排住處與日課。不要重新開始收徒測試。',
+  outer_checkin:'已到外門報到處，接引弟子許秋雁在場，可安排住處與日課。不要重新開始收徒測試。',
+  onboarded:'已領取外門居所牌和三日日課冊，明日辰時集合修行。玩家可以讀日課、認識新生或探索演武場。初試與報到早已結束。',
  }[phase];
  return '【場景階段：'+PHASES[phase]+'】'+scene+
   '\n【本回合玩家動作的結算】'+(official||'尚未達成下一個流程里程碑；但本回合必須有新的回答、人物反應、可見進展或線索，不能複製上回合的敘述。')+
@@ -129,6 +145,7 @@ export function demoProgressReply(world,text){
   case 'test_ready':return '韓守一看了你一眼，拿筆點了點面前的名冊。\n\n「洛河，十五歲，已登記。測靈石就在你面前，將手掌按上去就行。若不放心，可以先看別人怎麼做。」\n\n旁邊的測試臺忽然亮起一抹金光，隊伍裡傳來低低的驚嘆。';
   case 'result_known':return '韓守一看著已記錄的靈根結果，解釋了幾句修行上可能的方向。\n\n「靈根只決定起步方向，不保證日後成就。先拿木牌，後面的外門接引弟子會把規矩說清楚。」';
   case 'admitted':return '山門裡漸漸熱鬧起來。韓守一收好名冊，指向通往外門的石道。\n\n「你已通過初試。拿著木牌去報到，或者趁現在問我一兩件事。別讓隊伍等太久。」';
-  default:return '接引弟子抬頭看向洛河手中的木牌。\n\n「先登記住處，再領日課冊。你也可以先跟其他新弟子認識認識。」';
+  case 'outer_checkin':return '接引弟子抬頭看向洛河手中的木牌。\n\n「先登記住處，再領日課冊。你也可以先跟其他新弟子認識認識。」';
+  default:return '新生班的日課冊上寫著：晨練、基礎吐納、山規講解。身旁兩個新弟子正討論明天的演武場晨課。';
  }
 }
