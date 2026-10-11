@@ -14,6 +14,8 @@ import {nextBeatDirective,assessContinueReply,retryContinueDirective,isContinueI
 import {sceneJumpPlan,prepareSceneJump} from '../../../../v3/server/scene-jump.mjs';
 // @ts-ignore - backend narration fact guard
 import {checkWorldFacts,correctionDirective} from '../../../../v3/server/world-fact-guard.mjs';
+// @ts-ignore - explicit action adjudication quality gate
+import {assessActionResolution,actionResolutionDirective} from '../../../../v3/server/action-resolution.mjs';
 
 export const dynamic='force-dynamic';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -137,7 +139,7 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:key,instructions:instructions+timeDirective+progressionDirective+(scenePlan?'\n\n'+scenePlan.directive:''),input:gmContext(actingWorld,text),maxOutputTokens:1000};
+   const args={apiKey:key,instructions:instructions+timeDirective+progressionDirective+(scenePlan?'\n\n'+scenePlan.directive:'')+actionResolutionDirective(text),input:gmContext(actingWorld,text),maxOutputTokens:1000};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
@@ -145,14 +147,16 @@ export async function POST(request:Request){
    answer=result.text;usage=result.usage;
    const quality=assessContinueReply(text,answer);
    const facts=checkWorldFacts(actingWorld,answer);
-   if((!quality.ok&&isContinueIntent(text))||!facts.ok){
+   const action=assessActionResolution(text,answer);
+   if((!quality.ok&&isContinueIntent(text))||!facts.ok||!action.ok){
     // Draft is never saved. Retry only clearly stalled "繼續" turns, at most once.
     const retry=await generate(args.instructions+
      (!quality.ok&&isContinueIntent(text)?retryContinueDirective(quality):'')+
-     (!facts.ok?correctionDirective(facts):''));
+     (!facts.ok?correctionDirective(facts):'')+
+     (!action.ok?actionResolutionDirective(text,action):''));
     answer=retry.text;
     usage={totalTokens:(result.usage?.totalTokens||0)+(retry.usage?.totalTokens||0)};
-    if((isContinueIntent(text)&&!assessContinueReply(text,answer).ok)||!checkWorldFacts(actingWorld,answer).ok){
+    if((isContinueIntent(text)&&!assessContinueReply(text,answer).ok)||!checkWorldFacts(actingWorld,answer).ok||!assessActionResolution(text,answer).ok){
      return reply({error:'GM 回覆未通過敘事一致性檢查，世界與遊戲時間未儲存，請重試。'},502);
     }
    }
