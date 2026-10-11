@@ -11,6 +11,7 @@ import {sceneConversationForGM,episodicMemoriesForGM} from './conversation-memor
 import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory} from './durable-memory.mjs';
 import {initialEventCalendar,ensureEventCalendar,addScheduledEvent,advanceEventCalendar,eventCalendarForGM} from './event-calendar.mjs';
 import {BUILTIN_EVENT_TEMPLATES,eventSourceCategory,GAME_YEAR_DAYS} from './event-templates.mjs';
+import {initialNPCAgency,ensureNPCAgency,advanceNPCAgency,npcAgencyForGM} from './npc-agency.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -39,12 +40,14 @@ export const NPCS=Object.freeze(Object.fromEntries(CHARACTER_BIBLE.map(actor=>[
 ])));
 
 export function initialV3World(id){
- return {id,mode:'v3',version:4,revision:0,minute:480,day:1,location:'太虛宗山門',
+ const initial={id,mode:'v3',version:4,revision:0,minute:480,day:1,location:'太虛宗山門',
   protagonist:{name:'洛河',age:15,gender:'女',hometown:'青石鎮',
    family:clone(WORLD_BIBLE.protagonist.family),
    aptitude:{grade:'未知',description:'尚未完成靈根與資質測試；不能僅因往昔世界線直接認定。'},
    realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
+  npcs:clone(NPCS),npcAgency:null,eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
+ initial.npcAgency=initialNPCAgency(initial);
+ return initial;
 }
 export function validatedWorld(value){
  if(!value||value.mode!=='v3'||!Array.isArray(value.messages)||!Array.isArray(value.events)
@@ -76,6 +79,7 @@ export function validatedWorld(value){
   c.privateNotes=Array.isArray(c.privateNotes)?c.privateNotes:[];
   c.relationships={player:{...relationship(),...c.relationships?.player}};
  }
+ ensureNPCAgency(value);
  return value;
 }
 export function playerWorld(world){
@@ -94,6 +98,7 @@ export function developerWorld(world){
   location:world.location,bibleVersion:WORLD_BIBLE_VERSION,
   worldBible:clone(WORLD_BIBLE),protagonist:clone(world.protagonist),
   characters:clone(world.npcs),events:clone(world.events.slice(-25)),
+  npcAgency:clone(ensureNPCAgency(world)),
   eventCalendar:clone(ensureEventCalendar(world)),
   eventTemplates:clone(BUILTIN_EVENT_TEMPLATES),gameYearDays:GAME_YEAR_DAYS,
   livingArcs:clone(world.living?.arcs||[]),
@@ -148,6 +153,7 @@ export function gmContext(world,userText){
   people.slice(0,2300),
   worldPlanForGM(world).slice(0,550),
   eventCalendarForGM(world,1300),
+  npcAgencyForGM(world,1050),
   ('【長期重要經歷（依存檔原話，不代表每個NPC都知情）】\n'+durable).slice(0,1300),
   chapters.slice(0,280),
   episodicMemoriesForGM(world,userText,1100),
@@ -247,6 +253,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  advanceEventCalendar(next,before,after);
  updateDurableMemory(next,next.events.find(e=>e.id===eventId));
  advanceLivingWorld(next,before,after);
+ advanceNPCAgency(next,before,after);
  maybeWriteChapter(next);
  return next;
 }
@@ -289,6 +296,9 @@ export function editCharacter(world,id,patch,note,by='developer'){
  if(patch.privateNote!==undefined){
   if(typeof patch.privateNote!=='string'||!patch.privateNote.trim()||patch.privateNote.length>240)throw Error('私人備註需1至240字');
   actor.privateNotes.push(patch.privateNote.trim());
+ }
+ if(['where','goal','role','plan'].some(k=>patch[k]!==undefined)){
+  ensureNPCAgency(next).agendas[id]=initialNPCAgency(next).agendas[id];
  }
  next.revision++;
  next.developerAudit??=[];
