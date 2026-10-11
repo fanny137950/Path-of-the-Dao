@@ -26,6 +26,14 @@ export const WORLD_BIBLE=Object.freeze({
    '以前遊玩過的事只是參考的人物原型，不是新存檔已經發生的事件',
   ],
  },
+ protagonist:{
+  source:'established',name:'洛河',gender:'女',age:15,home:'青石鎮',
+  family:['洛成安：父親，木匠','柳氏：母親','洛小川：弟弟，十一歲'],
+  characterReference:['機靈好奇','嘴硬','有天才般的自信','大膽愛切磋','對師門和朋友有感情'],
+  playerControl:'以上只作原型參考，玩家能自由塑造她；GM 不得代她說話、決策或下內心結論。',
+  beginning:'新測試世界線：尚未正式入宗，尚未測定靈根，未建立師徒、恩怨或風痕經歷。',
+  aptitude:'初始未知；未完成測試前不能僅因以前玩過純風天才就自行寫成已公布的測試結果。',
+ },
  foundations:{
   source:'established',era:'大周曆，太虛宗收徒大典時期',
   geography:'九州廣闊，人族大周仙朝諸郡、北荒妖庭、妖獸山脈與宗門屬地交錯。傳訊、傳送與長途旅行需付代價；世界不會因主角在場而停止。',
