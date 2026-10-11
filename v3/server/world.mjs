@@ -1,3 +1,5 @@
+import {replySuggestions} from './reply-suggestions.mjs';
+import {validateObjectiveNarrative} from './turn-validation.mjs';
 import {isNonNarrative,requireNarrative,visibleNarrative} from './narrative.mjs';
 import {initialScene,sceneOf,updateScene,sceneContext} from './scene-context.mjs';
 import {initialLivingWorld,elapsedMinutes,timeCost,advanceLivingWorld,maybeWriteChapter,recallChapters,worldPlanForGM} from './living-world.mjs';
@@ -79,7 +81,7 @@ export function playerWorld(world){
    ?{...m,content:isNonNarrative(m.content)
       ?'（先前免費模型的回應無效，已排除在遊戲劇情之外。）'
       :visibleNarrative(m.content)}:m),
-  phase:'freeform',choices:[]};
+  phase:'freeform',choices:[],suggestions:replySuggestions(world)};
 }
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
@@ -108,7 +110,7 @@ export function recalledMemories(actor,query,limit=8){
   m,score:[...terms(m.text||'')].filter(k=>keys.has(k)).length*8+(m.importance||1)*2+i/Math.max(1,mem.length)
  })).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.m);
 }
-export function gmContext(world,userText){
+export function gmContext(world,userText,{structuredConversation=false}={}){
  const badEvents=new Set(world.events.filter(e=>isNonNarrative(e.reply)).map(e=>e.id));
  const recent=world.messages.slice(-22)
   .filter(m=>m.role!=='assistant'||!isNonNarrative(m.content))
@@ -125,7 +127,7 @@ export function gmContext(world,userText){
  }).join('\n');
 
  const relevantEvents=world.events.filter(e=>e.type==='conversation'&&!badEvents.has(e.id))
-  .map((e,i)=>({e,score:terms(e.text+' '+e.reply).size+
+  .map((e,i)=>({e,score:
     [...terms(userText)].filter(t=>terms(e.text+' '+e.reply).has(t)).length*10+i/Math.max(world.events.length,1)}))
   .sort((a,b)=>b.score-a.score).slice(0,7)
   .map(({e})=>'第'+e.day+'日：洛河 '+shorten(e.text,100)+'；'+shorten(visibleNarrative(e.reply),140)).join('\n');
@@ -145,8 +147,8 @@ export function gmContext(world,userText){
   worldPlanForGM(world).slice(0,680),
   chapters.slice(0,700),
   ('【相關舊事】\n'+relevantEvents).slice(0,950),
-  '【最近對話原文】\n'+recent.slice(-2900),
-  '【洛河最新輸入】'+userText,
+  structuredConversation?'':'【最近對話原文】\n'+recent.slice(-2900),
+  structuredConversation?'':'【洛河最新輸入】'+userText,
   rootRule,
   '【GM規則】延續上個回合，不強迫完成任務。NPC各有個性與自己知道的事。玩家說「繼續」時自然推進但不代她決定。'
  ];
@@ -190,6 +192,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
  if(world.events.filter(e=>e.type==='conversation').length>=1000)throw Error('試玩世界已達1000回合，請先備份');
  const before=elapsedMinutes(world);
  const present=new Set(presentIds(world)),parsed=parseGMResult(rawAnswer),next=clone(world);
+ validateObjectiveNarrative(world,parsed.narration);
  const move=parsed.move;
  const approvedMove=move&&LOCATIONS.includes(move.to)&&move.to!==world.location&&
   (userText.includes(move.to)||/(前往|走向|跟著|隨同|出發|帶我去)/.test(userText))&&
@@ -197,7 +200,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
   parsed.narration.includes(move.evidence)&&/(抵達|到達|來到|走進|進入)/.test(move.evidence)&&
   !/(尚未|未能|無法|不能|沒能|不准)/.test(move.evidence);
  next.revision++;
- const delta=approvedMove?Math.max(30,timeCost(userText)):timeCost(userText);
+ const delta=approvedMove?Math.max(30,timeCost(userText,world.minute)):timeCost(userText,world.minute);
  const after=before+delta;
  next.day=Math.floor(after/1440)+1;
  next.minute=after%1440;

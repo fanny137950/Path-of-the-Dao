@@ -9,6 +9,10 @@ import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
 // @ts-ignore - conservative objective-action stability filter
 import {stabilizeDecisiveAction} from '../../../../v3/server/outcome-stability.mjs';
 
+// @ts-ignore — server-only JS validator
+import {validateTurnRequest} from '../../../../v3/server/turn-validation.mjs';
+// @ts-ignore — server-only conversation protocol
+import {recentConversation,CONVERSATION_STYLE} from '../../../../v3/server/conversation.mjs';
 export const dynamic='force-dynamic';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
 function requireDB(){
@@ -48,6 +52,10 @@ export async function GET(request:Request){
  try{
   const user=await getChatGPTUser();if(!user)return reply({error:'請先登入'},401);
   const id=new URL(request.url).searchParams.get('world')||'';
+  if(!id){
+   const rows=await requireDB().prepare("SELECT id,name,revision,created FROM worlds WHERE owner=? AND json_extract(state,'$.mode')='v3' ORDER BY created DESC,id DESC").bind(user.userId).all();
+   return reply({worlds:rows.results});
+  }
   if(!/^[0-9a-f-]{36}$/.test(id))return reply({error:'無效世界 ID'},400);
   const world=await readWorld(id,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
@@ -55,7 +63,9 @@ export async function GET(request:Request){
    if(!isDeveloper(user.userId))return reply({error:'無權查看開發者資訊'},403);
    return reply(developerWorld(world));
   }
-  return reply(playerWorld(world));
+  const requestId=new URL(request.url).searchParams.get('requestId');
+  const confirmedRequestId=requestId&&world.events.some((event:{requestId?:string})=>event.requestId===requestId)?requestId:null;
+  return reply({...playerWorld(world),confirmedRequestId});
  }catch{return reply({error:'無法讀取世界'},500);}
 }
 export async function POST(request:Request){
@@ -88,8 +98,9 @@ export async function POST(request:Request){
   const text=body.text;
   if(typeof text!=='string'||!text.trim()||text.length>2500)return reply({error:'玩家輸入無效'},400);
   if(typeof body.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(body.requestId))return reply({error:'回合 ID 無效'},400);
-  const prior=world.events.find((e:{requestId:string})=>e.requestId===body.requestId);
-  if(prior)return reply({...playerWorld(world),usage:null});
+  const check=validateTurnRequest(world,body);
+  if(check.error)return reply({error:check.error},check.status);
+  if(check.replayed)return reply({...playerWorld(world),usage:null});
   if(world.events.filter((e:{type:string})=>e.type==='conversation').length>=1000)return reply({error:'試玩世界已達1000回合上限，請先備份'},409);
   const mode=body.mode;
   if(!['demo','ai','openrouter'].includes(mode))return reply({error:'未知對話模式'},400);
@@ -99,7 +110,7 @@ export async function POST(request:Request){
   let answer:string,usage:null|{totalTokens?:number}=null;
   if(mode==='demo')answer='韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
   else{
-   const args={apiKey:key,instructions,input:gmContext(world,text),maxOutputTokens:1000};
+   const args={apiKey:key,instructions:instructions+'\n\n'+CONVERSATION_STYLE,input:gmContext(world,text,{structuredConversation:true}),conversation:recentConversation(world,text),maxOutputTokens:1000};
    const result=mode==='openrouter'
     ?await generateOpenRouterResponse({...args,model:model||'openrouter/free'})
     :await generateGMResponse({...args,model:model||'gpt-4.1-mini'});
@@ -107,10 +118,16 @@ export async function POST(request:Request){
   }
   answer=stabilizeDecisiveAction(world,text,answer);
   const next=commitV3Turn(world,text,answer,body.requestId);
+  const committed=next.events.find((event:{requestId:string})=>event.requestId===body.requestId);
+  committed.request={mode:body.mode,model:body.model||'',revision:body.revision};
   // Compare-and-swap: no partial turn or lost concurrent update.
   const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
    .bind(JSON.stringify(next),next.revision,world.id,user.userId,world.revision).run();
-  if(result.meta.changes!==1)return reply({error:'世界已在另一個分頁更新，請重新整理後重試'},409);
+  if(result.meta.changes!==1){
+   const current=await readWorld(world.id,user.userId);
+   if(current&&validateTurnRequest(current,body).replayed)return reply({...playerWorld(current),usage:null});
+   return reply({error:'世界已在另一個分頁更新，請重新讀取後再決定行動'},409);
+  }
   return reply({...playerWorld(next),usage});
  }catch(e){
   const status=e&&typeof e==='object'&&'status'in e&&typeof e.status==='number'?e.status:500;

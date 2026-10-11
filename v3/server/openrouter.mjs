@@ -1,9 +1,10 @@
+import {providerMessages} from './conversation.mjs';
 import { AIProviderError } from './openai.mjs';
 import { isNonNarrative } from './narrative.mjs';
 
 /** Free-only OpenRouter adapter. The caller's key is never persisted or echoed. */
 export async function generateOpenRouterResponse({
- apiKey, model='openrouter/free', instructions, input,
+ apiKey, model='openrouter/free', instructions, input, conversation=/** @type {Array<{role:string,content:string}>|undefined} */ (undefined),
  fetchImpl=fetch, timeoutMs=35000, maxOutputTokens=1000,
 }) {
  if(typeof apiKey!=='string'||!apiKey.trim()||apiKey.length>300)
@@ -17,6 +18,7 @@ export async function generateOpenRouterResponse({
  if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>4000)
   throw new AIProviderError('輸出上限超出範圍',400);
 
+ const messages=providerMessages(input,conversation);
  // Free-router backends can spend their entire token budget in reasoning and
  // return content=null. Use a larger budget, low reasoning and at most one retry.
  for(let attempt=0;attempt<2;attempt++){
@@ -34,7 +36,7 @@ export async function generateOpenRouterResponse({
      messages:[
       {role:'system',content:instructions+
        '\n只輸出繁體中文修仙劇情與在場 NPC 的言行。不要輸出安全分類、User Safety、後台標籤、推理或空白。'},
-      {role:'user',content:input},
+      ...messages,
      ],
      provider:{max_price:{prompt:0,completion:0,request:0}},
     }),

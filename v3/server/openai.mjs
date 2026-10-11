@@ -1,3 +1,4 @@
+import {providerMessages} from './conversation.mjs';
 /**
  * V3 server-only OpenAI adapter. Never import into client components.
  * This module does not save API keys, messages or world state.
@@ -15,6 +16,7 @@ export async function generateGMResponse({
   model,
   instructions,
   input,
+  conversation=/** @type {Array<{role:string,content:string}>|undefined} */ (undefined),
   fetchImpl = fetch,
   timeoutMs = 30000,
   maxOutputTokens = 1200,
@@ -24,6 +26,7 @@ export async function generateGMResponse({
   if (typeof instructions !== 'string' || instructions.length > 20000) throw new AIProviderError('無效 GM 指示', 400);
   if (typeof input !== 'string' || !input.trim() || input.length > 12000) throw new AIProviderError('無效對話輸入', 400);
   if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 4000) throw new AIProviderError('輸出上限超出範圍', 400);
+  const messages=providerMessages(input,conversation);
   let response;
   try {
     response = await fetchImpl('https://api.openai.com/v1/responses', {
@@ -35,7 +38,7 @@ export async function generateGMResponse({
       body: JSON.stringify({
         model,
         instructions,
-        input,
+        input:conversation===undefined?input:messages,
         max_output_tokens: maxOutputTokens,
         store: false,
       }),

@@ -24,16 +24,23 @@ export function initialLivingWorld(){
 export function elapsedMinutes(world){
  return (world.day-1)*1440+world.minute;
 }
-export function timeCost(playerText){
- const text=String(playerText||'');
+export function timeCost(playerText,currentMinute=480){
+ // Quoted dialogue, questions, refusals and hypothetical plans are not actions.
+ // This remains a conservative parser, not unrestricted natural-language understanding.
+ const source=String(playerText||'');
+ const text=source.replace(/[「“][^」”]*[」”]|"[^"]*"/g,'')
+  .split(/[，,。！？!?；;\n]/).filter(part=>
+   !/(?:不|沒|未|別|拒絕|取消|先不).{0,4}(?:修煉|練劍|練功|打坐|等待|休息|睡|前往|走|閉關|跳過)/.test(part)&&
+   !/(?:問|詢問|如果|假如|假設|要是|打算|想要|考慮|能不能|可不可以|是否|怎麼|如何|為什麼)/.test(part)
+  ).join('，');
  if(/(?:過了|跳過|略過).{0,5}(?:三|3)天|三天後/.test(text))return 4320;
- if(/(?:隔天|第二天|明天早上|睡到明天)/.test(text))return 1440;
- if(/(?:等到|待到).{0,5}(?:天黑|夜晚|晚上)/.test(text))return 600;
+ if(/(?:隔天|第二天|明天早上|睡到明天)/.test(text))return 1440-currentMinute+480;
+ if(/(?:等到|待到).{0,5}(?:天黑|夜晚|晚上)/.test(text))return Math.max(0,1080-currentMinute);
  if(/(?:閉關|修煉|練劍|練功|打坐).{0,8}(?:一個時辰|兩個小時)/.test(text))return 120;
  if(/(?:練劍|修煉|打坐|讀書|休息|等待).{0,10}(?:一小時|半個時辰|一個小時)/.test(text))return 60;
  if(/(?:前往|走到|走向|趕往|出發|下山|上山|帶我去)/.test(text))return 30;
  if(/(?:切磋|練劍|修煉|打坐|上課|旁觀比試)/.test(text))return 25;
- if(/(?:聊天|詢問|告訴|問|說|想|看|觀察|繼續)/.test(text))return 4;
+ if(/(?:聊天|詢問|告訴|問|說|想|看|觀察|繼續)/.test(source))return 4;
  return 6;
 }
 export function advanceLivingWorld(world,startAbs,endAbs){
