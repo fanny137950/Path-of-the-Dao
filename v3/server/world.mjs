@@ -7,6 +7,7 @@ import {CHARACTER_BIBLE} from './character-bible.mjs';
 import {loreForGM,npcPortraitForGM} from './lore-retrieval.mjs';
 import {suggestedActions} from './action-suggestions.mjs';
 import {playerQuestJournal} from './player-journal.mjs';
+import {sceneConversationForGM,episodicMemoriesForGM} from './conversation-memory.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -112,9 +113,6 @@ export function recalledMemories(actor,query,limit=8){
 }
 export function gmContext(world,userText){
  const badEvents=new Set(world.events.filter(e=>isNonNarrative(e.reply)).map(e=>e.id));
- const recent=world.messages.slice(-22)
-  .filter(m=>m.role!=='assistant'||!isNonNarrative(m.content))
-  .map(m=>(m.role==='user'?'洛河':'GM')+'：'+shorten(m.role==='assistant'?visibleNarrative(m.content):m.content,520)).join('\n\n');
  const present=nearbyCharacters(world);
  const people=present.map(actor=>{
   const personal=(actor.memories||[]).filter(m=>!badEvents.has(m.eventId));
@@ -126,11 +124,6 @@ export function gmContext(world,userText){
    '\n【只有'+actor.name+'經歷或獲知的事件】'+(memory||'沒有相關舊事')+'。'+notes;
  }).join('\n');
 
- const relevantEvents=world.events.filter(e=>e.type==='conversation'&&!badEvents.has(e.id))
-  .map((e,i)=>({e,score:terms(e.text+' '+e.reply).size+
-    [...terms(userText)].filter(t=>terms(e.text+' '+e.reply).has(t)).length*10+i/Math.max(world.events.length,1)}))
-  .sort((a,b)=>b.score-a.score).slice(0,7)
-  .map(({e})=>'第'+e.day+'日：洛河 '+shorten(e.text,100)+'；'+shorten(visibleNarrative(e.reply),140)).join('\n');
  const chapters=recallChapters(world,userText,3)
   .map(c=>'【舊章節第'+c.from+'—'+c.to+'回合】'+shorten(c.text,650)).join('\n');
  const expectedRoot=pendingRootResult(world,userText);
@@ -142,20 +135,28 @@ export function gmContext(world,userText){
   scene.slice(0,500),
   sceneContext(world,userText).slice(0,850),
   ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。不在場NPC不能憑空旁聽、瞬移或知道他人的私密知情。').slice(0,220),
-  loreForGM(world,userText,2450),
-  people.slice(0,2200),
+  loreForGM(world,userText,2050),
+  people.slice(0,2300),
   worldPlanForGM(world).slice(0,680),
-  chapters.slice(0,700),
-  ('【相關舊事】\n'+relevantEvents).slice(0,950),
-  '【最近對話原文】\n'+recent.slice(-2900),
+  chapters.slice(0,400),
+  episodicMemoriesForGM(world,userText,1450),
+  sceneConversationForGM(world,userText,4700),
   '【洛河最新輸入】'+userText,
   rootRule,
   '【GM主動性】GM 必須管理NPC主動性，而非每回合只等洛河發令。讓NPC按照工作、立場、性格與眼前事件自行說話、互動、離場或引入新人物；並可表現真正在進行的宗門日常、已發生且角色有途徑知曉的世界事件。一般對話保持自然，避免每回合塞危機。玩家只說「繼續」時，應當至少讓眼前NPC採取一個有意義的新行動／說一句帶有新資訊的話，或讓可觀察的事件、時間與人物互動有所進展；不可只重複場景和詢問玩家要做什麼。若目前需要洛河親自決定是否觸碰、戰鬥、拜師等，GM 可以推進NPC的反應、催促或環境，但不能代洛河執行該決定。選項只是可選的輸入捷徑，不限制玩家自由行動。'
 
  ];
- // Explicit per-section budgets keep the current player input and latest replies
- // even in very long games; dropping the END of a long prompt would lose them.
- return output.filter(Boolean).join('\n\n').slice(0,11800);
+ // Fit optional sections without cutting the last (authoritative) user action
+ // or GM constraints. Scene transcript has priority over background lore.
+ const essential=output.slice(-3).filter(Boolean).join('\n\n');
+ const available=11800-essential.length-2;
+ let front='';
+ for(const section of output.slice(0,-3).filter(Boolean)){
+  const spare=available-front.length-(front?2:0);
+  if(spare<=0)break;
+  front+=(front?'\n\n':'')+section.slice(0,spare);
+ }
+ return (front?front+'\n\n':'')+essential;
 }
 const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
