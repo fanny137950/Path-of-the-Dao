@@ -23,11 +23,11 @@ test('history can recover an old promise without fabricating new claims',()=>{
  world=turn(world,1,'我答應韓守一三日後帶來刻著松紋的木劍','韓守一點頭：「我記住了，三日後見。」');
  for(let i=2;i<36;i++)world=turn(world,i,'我和韓守一閒聊今日排隊的人數'+i,'韓守一回了一句話。');
  const context=gmContext(world,'你還記得我們約好的松紋木劍嗎');
- assert.match(context,/松紋木劍/);
+ assert.match(context,/松紋的木劍/);
  assert.match(context,/三日後/);
  assert.ok(context.length<=11800);
  const after=validatedWorld(structuredClone(world));
- assert.match(gmContext(after,'說好的木劍呢'),/松紋木劍/);
+ assert.match(gmContext(after,'說好的木劍呢'),/松紋的木劍/);
 });
 
 test('scene changes on travel even if old destination scene was long',()=>{
