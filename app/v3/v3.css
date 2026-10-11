@@ -380,3 +380,53 @@
  .v3-brand-symbol{width:35px;height:35px}
  .v3-story-header,.v3-main-story .v3-story-header{padding-top:22px}
 }
+
+
+/* Private world task management, matching the text-first jade UI. */
+.v3-task-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:18px 0}
+.v3-task-overview>div{border:1px solid var(--v3-line,#465a50);border-radius:8px;padding:13px;background:#182b2a}
+.v3-task-overview small{display:block;color:#99afa3;font-size:11px;margin-bottom:8px}
+.v3-task-overview strong{color:#e9dfbe;font-size:15px}
+.v3-task-toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:16px 0}
+.v3-task-toolbar input,.v3-task-toolbar select,.v3-task-create input,.v3-task-create select{
+ background:#162827;color:#e8e9df;border:1px solid #62756677;border-radius:7px;padding:9px 12px;
+ font:inherit;font-size:12px;min-width:0}
+.v3-task-toolbar input{flex:1;min-width:180px}
+.v3-task-toolbar button,.v3-task-create>button{border:1px solid #adbd8b77;background:#28433a;color:#e9e5c9;padding:10px 14px;border-radius:7px;font-size:12px}
+.v3-task-grid{display:grid;grid-template-columns:minmax(210px,28%) minmax(0,1fr);gap:17px;margin-top:16px}
+.v3-task-list{display:flex;flex-direction:column;gap:4px;max-height:650px;overflow-y:auto;padding-right:8px}
+.v3-task-list button{display:flex;flex-direction:column;text-align:left;gap:6px;padding:13px;background:transparent;
+ color:#d8e1d8;border:1px solid #536c5b58;border-radius:7px}
+.v3-task-list button[aria-pressed="true"]{background:#294037;border-color:#9bba9c}
+.v3-task-list small{font-size:11px;color:#9bada3}
+.v3-task-detail{border-left:1px solid #657b654d;padding:6px 6px 12px 20px;min-width:0}
+.v3-task-detail h4,.v3-task-create h4{font-family:"Noto Serif TC",serif;font-size:18px;color:#ebe4d1;margin:0 0 12px}
+.v3-task-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 17px;font-size:12px;color:#bfcdc2}
+.v3-task-facts p{overflow-wrap:anywhere}
+.v3-task-secret{padding:13px;margin:13px 0;border:1px solid #96795488;background:#41332733;border-radius:8px;color:#dccaa4}
+.v3-task-secret p{font-size:12px;line-height:1.85}
+.v3-task-stages{border-left:1px solid #8e9f8166;margin:16px 0 20px;padding-left:18px}
+.v3-task-stage{margin-bottom:19px;padding:0 0 0 7px}
+.v3-task-stage strong{display:block;color:#e3e5d8;font-size:13px;margin:6px 0}
+.v3-task-stage p{font-size:12px;line-height:1.8;color:#aabcaf;margin:3px 0}
+.v3-task-stage>span{font-size:10px;color:#a5b4a7}
+.v3-task-stage>span.v3-task-finished{color:#a9d3a4}
+.v3-task-create{border:1px solid #697f6966;background:#172c2a;border-radius:9px;padding:18px;margin:15px 0}
+.v3-task-create p{color:#a7b8a8;font-size:12px;line-height:1.8}
+.v3-task-create .v3-dev-edit-grid label{font-size:12px}
+.v3-task-create .v3-dev-edit-grid input,.v3-task-create .v3-dev-edit-grid select{width:100%}
+.v3-task-create .v3-dev-edit-grid small{display:block;font-size:10px;color:#a4bca7;margin-top:5px}
+.v3-task-public{display:flex;gap:10px;align-items:center;color:#bfcec0;font-size:12px;margin:13px 0}
+.v3-task-public input{width:auto}
+.v3-task-detail .v3-danger-btn{border:1px solid #b87e7488;background:transparent;color:#e0aea7;padding:8px 13px;border-radius:6px;font-size:12px}
+@media(max-width:760px){
+ .v3-task-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .v3-task-grid{grid-template-columns:1fr}
+ .v3-task-list{max-height:290px}
+ .v3-task-detail{padding:16px 2px;border-left:0;border-top:1px solid #657b654d}
+ .v3-task-facts{grid-template-columns:1fr}
+ .v3-task-toolbar{align-items:stretch}
+ .v3-task-toolbar input{flex-basis:100%}
+ .v3-header-nav{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .v3-header-nav button{padding:10px 2px;font-size:11px}
+}
