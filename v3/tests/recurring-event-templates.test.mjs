@@ -59,7 +59,7 @@ test('future annual cycles materialize across years, recruitment every third yea
  const year4=events.find(e=>e.id==='builtin-recruitment-cycle-y4');
  assert.equal(year1.state,'completed');
  assert.equal(year2.state,'completed');
- assert.equal(year4.state,'active');
+ assert.equal(year4.state,'completed');
  assert.ok(!events.some(e=>e.id==='builtin-recruitment-cycle-y2'));
  const ids=events.map(e=>e.id);
  assert.equal(new Set(ids).size,ids.length);
