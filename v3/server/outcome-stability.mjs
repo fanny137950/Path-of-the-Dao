@@ -1,4 +1,4 @@
-import {visibleNarrative} from './narrative.mjs';
+import {visibleNarrative,isNonNarrative} from './narrative.mjs';
 import {pendingRootResult} from './action-rules.mjs';
 
 /**
@@ -9,7 +9,7 @@ import {pendingRootResult} from './action-rules.mjs';
  */
 export function stabilizeDecisiveAction(world,playerText,raw){
  const root=pendingRootResult(world,playerText);
- if(!root)return raw;
+ if(!root||isNonNarrative(raw))return raw;
  const narrative=visibleNarrative(raw);
  if(/(?:不准|不許|攔住|阻止|擋下|拒絕|尚未|還沒|未能|無法|沒有碰到|沒能接觸|來不及)/.test(narrative))
   return raw;
