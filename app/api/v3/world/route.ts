@@ -6,6 +6,8 @@ import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commi
 import {generateGMResponse} from '../../../../v3/server/openai.mjs';
 // @ts-ignore - module is authored in JS
 import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
+// @ts-ignore - conservative objective-action stability filter
+import {stabilizeDecisiveAction} from '../../../../v3/server/outcome-stability.mjs';
 
 export const dynamic='force-dynamic';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -23,6 +25,10 @@ const instructions=`你是《問道九州》的中央 GM，不是選項式任務
 【動作與對話】短輸入應依上下文判斷：例如面前只有測靈石時「手放上去」自然是按在石頭上。行動依現實條件結算，不能所有行為都自動成功，也不能強制玩家回去完成某項任務。修為與因果限制仍在。適時提供新線索、他人行動或日常變化，但不必每回合都有危機。
 
 【文風】繁體中文。旁白與NPC台詞同一則訊息；語言直接自然、人物各有口氣，避免奇怪比喻及冗長重複。純對話可很短；複雜事件可寫長一些。不要生成供點擊的固定選項；玩家自行輸入。
+
+【主角控制界線】絕對不能替洛河編造內心獨白、想法、害怕、決心、額外台詞或尚未輸入的下一步行動；可以描寫玩家剛才選擇的動作如何成功或失敗。不要讓洛河突然拿起整顆測靈石，除非她明確說要搬動石頭。
+
+【場景連續性】伺服器會提供上一幕的精確場景錨點。每回合從上一個動作停止的位置接續，不要因大地點仍為山門就重新走回山門口，也不要重畫同一段晨光、松樹與人群。對「放上去」「碰一下」等省略受詞的短句，優先使用當前互動物件。
 
 【結構化建議（可不填）】若NPC情緒、對玩家態度或洛河地點確實改變，可在敘事末尾加 <!--GM_STATE:{"changes":[{"id":"registrar","mood":"好奇","relationship":{"favor":1},"evidence":"敘事中的原文字句"}],"move":{"to":"棲風峰","evidence":"抵達棲風峰"}}-->。只有在場人物的固定ID才能改心情/好感，單次增減不超過2，且 evidence 必須逐字見於玩家輸入或敘事。move 僅在玩家選擇移動且已到達時提交，未到達不要填。此標記由伺服器驗證後剝除；不要在文字中討論它。沒有任何需要保存的改變就不要寫標記。`;
 function isDeveloper(userId:string){
@@ -99,6 +105,7 @@ export async function POST(request:Request){
     :await generateGMResponse({...args,model:model||'gpt-4.1-mini'});
    answer=result.text;usage=result.usage;
   }
+  answer=stabilizeDecisiveAction(world,text,answer);
   const next=commitV3Turn(world,text,answer,body.requestId);
   // Compare-and-swap: no partial turn or lost concurrent update.
   const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')

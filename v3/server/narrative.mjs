@@ -2,7 +2,8 @@
  * Defensive display-only validation for model output. Classification/debug messages
  * are not in-world narration and must never become official NPC memories.
  */
-const metadata=/\n?<!--GM_STATE:[\s\S]{1,3000}-->\s*$/;
+// Models sometimes omit the closing --> or produce invalid JSON. Metadata must never render.
+const metadata=/(?:\r?\n)?<!--GM_STATE:[\s\S]*$/;
 const singleLabel=/^(?:user\s+safety|safety|content\s+safety|moderation|risk\s+level|policy\s+check|classification)\s*:\s*(?:safe|unsafe|allow|allowed|pass|passed|blocked|low|medium|high|none|true|false|[0-9]+)\s*$/i;
 const statusOnly=/^(?:user\s+safety\s*:\s*[^\r\n]+|safety\s*:\s*[^\r\n]+|(?:result|status)\s*:\s*(?:safe|unsafe|pass|passed))$/i;
 export function visibleNarrative(raw){
