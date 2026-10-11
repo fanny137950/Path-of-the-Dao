@@ -1,5 +1,6 @@
+import {initialProgress,progressOf,prepareProgress,applyPreparedProgress,suggestedActions,progressFacts} from './progression.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
-export const V3_INTRO='太虛宗收徒大典，山門前人潮如織。高臺上，負責測試靈根的執事抬起眼。\n\n「下一位。姓名？」\n\n你是十五歲的洛河，今日第一次踏入太虛宗。';
+export const V3_INTRO='太虛宗收徒大典。十五歲的洛河穿過山門，來到測試臺前。\n\n韓守一核對玉簡：「洛河，十五歲，名冊上有你。」\n\n他指向桌邊一塊泛著微光的測靈石：「手掌按上去便可測靈根。不急，也可以先問我測試規矩。」\n\n後面的隊伍正緩緩向前移動。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
 export const CONDITIONS=['健康','輕傷','受傷','重傷','休養'];
 export const LOCATIONS=['太虛宗山門','太虛宗主峰','棲風峰','演武場','藏經樓','內門居所'];
@@ -22,17 +23,20 @@ export const NPCS=Object.freeze({
   '修行並協助同門',['溫和','愛開玩笑','擅長圓場'],'隨和，略帶調侃','修煉與同門支援'),
  gu:make('gu','顧長青','棲風峰親傳師兄','築基中期','未記載','棲風峰',
   '穩步修行',['內斂','謹慎'],'不多話，重視實際行動','修煉與內門日課'),
+ guide:make('guide','許秋雁','太虛宗外門接引弟子','聚氣中期','未記載','外門報到處',
+  '安排新弟子住所與日課',['細心','忙碌','喜歡清楚的問題'],'親切但辦事俐落','接待新弟子、分發日課冊'),
 });
 export function initialV3World(id){
  return {id,mode:'v3',version:2,revision:0,minute:480,day:1,location:'太虛宗山門',
   protagonist:{name:'洛河',age:15,realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[]};
+  npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],progress:initialProgress()};
 }
 export function validatedWorld(value){
  if(!value||value.mode!=='v3'||!Array.isArray(value.messages)||!Array.isArray(value.events)
  ||!Number.isInteger(value.minute)||!Number.isInteger(value.revision)||!value.npcs
  ||typeof value.npcs!=='object'||!value.protagonist)throw Error('世界資料損毀');
- value.version=2;
+ value.version=3;
+ value.progress=progressOf(value);
  value.developerAudit??=[];
  for(const [id,defaults] of Object.entries(NPCS)){
   const original=value.npcs[id]||{};
@@ -53,7 +57,8 @@ export function validatedWorld(value){
 }
 export function playerWorld(world){
  return {id:world.id,revision:world.revision,day:world.day,minute:world.minute,
- location:world.location,protagonist:world.protagonist,messages:world.messages};
+ location:world.location,protagonist:world.protagonist,messages:world.messages,
+  phase:progressOf(world).phase,choices:suggestedActions(world)};
 }
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
@@ -98,7 +103,7 @@ export function gmContext(world,userText){
   '；不在場人物不能憑空旁聽、瞬間出現。\n'+people+
   '\n【過去已紀錄的事件】'+world.events.slice(-6).map(e=>'第'+e.day+'日：'+shorten(e.text,90)).join('；')+
   '\n【最近對話】\n'+recent+'\n【洛河最新行動】'+userText+
-  '\n【知情規則】每人只能使用自身知道的線索。不得把一人秘密變成其他人的知識。AI 敘述不等同正式修改資料庫修為、位置、物品。';
+  '\n【知情規則】每人只能使用自身知道的線索。不得把一人秘密變成其他人的知識。AI 敘述不等同正式修改資料庫修為、位置、物品。\n'+progressFacts(world,userText);
 }
 const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
@@ -134,6 +139,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
  if(world.events.some(e=>e.requestId===requestId))throw Error('重複回合');
  if(world.events.length>=1000)throw Error('試玩世界已達1000回合，請先備份');
  const present=new Set(presentIds(world)),parsed=parseGMResult(rawAnswer),next=clone(world);
+ const progression=prepareProgress(world,userText);
  const move=parsed.move;
  // A narrative alone cannot teleport the player. Movement needs a matching player request,
  // a known destination and quoted evidence of arrival in the GM response.
@@ -142,14 +148,18 @@ export function commitV3Turn(world,userText,rawAnswer,requestId){
   typeof move.evidence==='string'&&move.evidence.length>=4&&move.evidence.length<=100&&
   parsed.narration.includes(move.evidence)&&/(抵達|到達|來到|走進|進入)/.test(move.evidence)&&
   !/(尚未|未能|無法|不能|沒能|不准)/.test(move.evidence);
- next.revision++;next.minute+=approvedMove?30:5;
+ next.revision++;next.minute+=(approvedMove||progression.toLocation)?30:5;
  while(next.minute>=1440){next.minute-=1440;next.day++;}
  if(approvedMove)next.location=move.to;
- const eventId='turn:'+next.revision,seenBy=privacyHint(userText)?[]:[...present];
+ applyPreparedProgress(next,progression);
+ const eventId='turn:'+next.revision;
+ const witnesses=new Set([...present,...(progression.toLocation?presentIds(next):[])]);
+ const seenBy=privacyHint(userText)?[]:[...witnesses];
  next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration});
  next.events.push({requestId,id:eventId,revision:next.revision,day:next.day,minute:next.minute,
  type:'conversation',text:userText,reply:parsed.narration,location:world.location,
- destination:approvedMove?move.to:null,witnesses:seenBy});
+ milestone:progression.kind,root:progression.root||null,
+ destination:progression.toLocation||(approvedMove?move.to:null),witnesses:seenBy});
  for(const id of seenBy){
   const actor=next.npcs[id];
   actor.knowledge.push(eventId);
