@@ -17,9 +17,9 @@ type DeveloperData={
 type WorldView={id:string;revision:number;day:number;minute:number;location:string;messages:{role:'user'|'assistant';content:string}[]};
 const moods=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
 const conditions=['健康','輕傷','受傷','重傷','休養'];
-type Draft={mood:string;status:string;where:string;goal:string;cultivationProgress:string;favor:string;trust:string;respect:string;privateNote:string};
+type Draft={mood:string;status:string;where:string;goal:string;cultivationProgress:string;favor:string;trust:string;respect:string;privateNote:string;role:string;realm:string;roots:string;traits:string;speech:string;plan:string};
 function fromCharacter(c:Character):Draft{
- return {mood:c.mood,status:c.status,where:c.where,goal:c.goal,
+ return {mood:c.mood,status:c.status,where:c.where,goal:c.goal,role:c.role,realm:c.realm,roots:c.roots,traits:c.traits.join('、'),speech:c.speech,plan:c.plan,
   cultivationProgress:String(c.cultivationProgress),
   favor:String(c.relationships.player.favor),trust:String(c.relationships.player.trust),
   respect:String(c.relationships.player.respect),privateNote:''};
@@ -57,6 +57,8 @@ export default function V3DeveloperPanel({
   try{
    const patch={
     mood:draft.mood,status:draft.status,where:draft.where,goal:draft.goal,
+    role:draft.role,realm:draft.realm,roots:draft.roots,speech:draft.speech,plan:draft.plan,
+    traits:draft.traits.split(/[、,，]/).map(x=>x.trim()).filter(Boolean),
     cultivationProgress:Number(draft.cultivationProgress),
     relationship:{favor:Number(draft.favor),trust:Number(draft.trust),respect:Number(draft.respect)},
     ...(draft.privateNote.trim()?{privateNote:draft.privateNote.trim()}:{})
@@ -87,11 +89,14 @@ export default function V3DeveloperPanel({
    <div className="v3-dev-details">
     {!actor||!draft?<p>請選擇人物。</p>:<>
      <h4>{actor.name} <span className="v3-dev-muted">#{actor.id}</span></h4>
-     <p><strong>身分：</strong>{actor.role}　<strong>靈根：</strong>{actor.roots}</p>
-     <p><strong>境界：</strong>{actor.realm}　<strong>日常計畫：</strong>{actor.plan}</p>
-     <p><strong>人格：</strong>{actor.traits.join('、')}</p>
-     <p><strong>說話風格：</strong>{actor.speech}</p>
+     <p><strong>人物核心資料與日常狀態</strong> — 人格與修為的修改僅供開發者使用，AI 無權直接改寫。</p>
      <div className="v3-dev-edit-grid">
+      <label>身分／職責<input value={draft.role} maxLength={80} onChange={e=>change('role',e.target.value)}/></label>
+      <label>境界<input value={draft.realm} maxLength={40} onChange={e=>change('realm',e.target.value)}/></label>
+      <label>靈根<input value={draft.roots} maxLength={50} onChange={e=>change('roots',e.target.value)}/></label>
+      <label className="v3-dev-wide">人格特質（以頓號分隔）<input value={draft.traits} onChange={e=>change('traits',e.target.value)}/></label>
+      <label className="v3-dev-wide">說話風格<input value={draft.speech} maxLength={180} onChange={e=>change('speech',e.target.value)}/></label>
+      <label className="v3-dev-wide">日常行程<input value={draft.plan} maxLength={180} onChange={e=>change('plan',e.target.value)}/></label>
       <label>情緒<select value={draft.mood} onChange={e=>change('mood',e.target.value)}>
        {moods.map(x=><option key={x}>{x}</option>)}</select></label>
       <label>身體狀態<select value={draft.status} onChange={e=>change('status',e.target.value)}>
