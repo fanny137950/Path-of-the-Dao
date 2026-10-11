@@ -228,3 +228,155 @@
 .v3-current-clock strong{color:#f2e7c8;font-family:"Noto Serif TC",ui-serif,serif;font-size:17px;font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums}
 .v3-current-clock small{color:#a9bca8;font-size:11px;line-height:1.5}
 @media(max-width:740px){.v3-current-clock strong{font-size:16px}}
+
+
+/* V3 literary jade theme — pure typography, no character art or chat bubbles.
+   Keeps all existing story/quest/time/developer interactions and D1 state. */
+.v3-shell{
+ --v3-bg:#101b1d;--v3-surface:#162426;--v3-soft:#1b2e2e;
+ --v3-line:#344a458a;--v3-text:#e9ede6;--v3-dim:#9eafa7;
+ --v3-accent:#bfae84;--v3-gold:#c8b587;
+ color:var(--v3-text);background:#101b1d;
+}
+.v3-header{
+ min-height:74px;padding-top:12px;padding-bottom:12px;
+ background:#121f21f7;border-bottom:1px solid var(--v3-line);
+ box-shadow:none;
+}
+.v3-brand-symbol{
+ width:38px;height:38px;border-radius:7px;
+ font-size:21px;background:#1a302d;border:1px solid #9c977451;box-shadow:none;
+}
+.v3-brand{gap:12px}
+.v3-brand-kicker{font-size:9px;letter-spacing:.13em;color:#9aa99f}
+.v3-brand strong{font-size:21px;letter-spacing:.12em;color:#f0eee4}
+.v3-brand p{font-size:10px;color:#8fa29a}
+.v3-header-nav{background:transparent;border:0;padding:0;gap:3px}
+.v3-header-nav button{border:0;border-radius:6px;padding:8px 13px;color:#9eafa8}
+.v3-header-nav button.v3-tab-active{
+ border-bottom:1px solid #c9b68a;color:#e6e5da;
+ background:#1b2f2c;box-shadow:none;
+}
+.v3-status-bar{
+ background:#142224;color:#92a69d;border-bottom:1px solid #30423d;
+ padding-top:9px;padding-bottom:9px;
+}
+.v3-story-header,.v3-main-story .v3-story-header{padding-top:26px;padding-bottom:14px}
+.v3-story-header h1{
+ font-size:clamp(19px,2.5vw,25px);font-weight:500;letter-spacing:.18em;
+ color:#d6c59c;margin:6px 0 10px;
+}
+.v3-story-header .v3-eyebrow{font-size:9px;color:#91a89b}
+.v3-story-ornament{font-size:9px;color:#bba77d}
+.v3-story-ornament span{width:36px;opacity:.48}
+.v3-messages,.v3-main-story .v3-messages{
+ gap:0;padding-top:10px;padding-bottom:30px;width:min(800px,100%);
+}
+/* Literary sections, not self-contained rounded cards. */
+.v3-messages article{
+ border:0;border-radius:0;box-shadow:none;
+ white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.v3-assistant{
+ background:transparent!important;border:0!important;
+ border-radius:0!important;box-shadow:none!important;
+ padding:16px 7px 20px;
+ margin:0;
+}
+.v3-user{
+ width:auto;max-width:100%;align-self:stretch!important;
+ background:transparent!important;border:0!important;border-top:1px solid #68837436!important;
+ padding:14px 7px 18px;margin:0;
+ border-radius:0!important;box-shadow:none!important;
+}
+.v3-label{gap:9px;font-size:11px;color:#c6b183;letter-spacing:.07em;margin-bottom:8px}
+.v3-user .v3-label{color:#9dc1ac}
+.v3-speaker-dot{width:4px;height:4px;box-shadow:none}
+.v3-content{
+ font-family:"Noto Serif TC","Songti TC","Source Han Serif TC",ui-serif,serif;
+ color:#e9ede6;font-size:15px;line-height:2.16;letter-spacing:.025em;
+}
+.v3-user .v3-content{
+ font-size:14px;color:#d1ddd2;line-height:1.94;
+}
+.v3-thinking{
+ background:transparent;border:0;border-left:2px solid #b7a77866;
+ border-radius:0;padding:12px 13px;margin:6px 0 12px;
+}
+.v3-play-layout{
+ width:min(1280px,100%);grid-template-columns:230px minmax(0,1fr);
+ gap:31px;padding:0 24px;
+}
+.v3-quest-sidebar{
+ top:120px;max-height:calc(100vh - 140px);
+ background:transparent;border:0;border-right:1px solid var(--v3-line);
+ border-radius:0;box-shadow:none;
+ margin-top:17px;padding:15px 19px 16px 4px;
+}
+.v3-quest-heading h2{font-size:17px;margin:5px 0 12px;color:#dcd7c2}
+.v3-quest-count{padding:3px 8px;background:transparent;border:1px solid var(--v3-line)}
+.v3-quest-subtitle{line-height:1.75}
+.v3-quest-card{
+ border:0;border-top:1px solid #7e99773b;border-radius:0;
+ background:transparent;padding:16px 2px 12px;margin:0;
+}
+.v3-quest-card h3{font-size:13px;color:#e5dfcc;margin:9px 0 8px}
+.v3-quest-progress{height:3px;background:#4b62583d}
+.v3-quest-progress span{background:#9bb398}
+.v3-main-story{min-height:calc(100dvh - 120px)}
+.v3-main-story .v3-compose{
+ background:#162426f7;border-top:1px solid #55695d78;
+ border-radius:0;box-shadow:none;padding:16px 20px 15px;
+}
+.v3-compose-top{color:#b2c2ae}
+.v3-compose textarea{
+ background:#1b2e2e;border:1px solid #50635b9c;
+ border-radius:7px;color:#eff1e8;min-height:62px;
+}
+.v3-compose textarea:focus{border-color:#acb99a;box-shadow:0 0 0 2px #c6b58313}
+.v3-send-btn{
+ background:#c8b587;color:#172421!important;
+ border:0;border-radius:7px;box-shadow:none;
+ min-width:76px;
+}
+.v3-send-btn:hover:not(:disabled){background:#e2ce9e;transform:none}
+.v3-actions{border-top:1px solid #52695b30;margin-top:12px;padding:15px 6px}
+.v3-actions-title{color:#c5cdb5}
+.v3-actions-buttons button{
+ background:transparent;border:1px solid #657c674f;
+ color:#bbcbbf;border-radius:6px;padding:8px 12px;
+}
+.v3-actions-buttons button:hover:not(:disabled){background:#223832;transform:none}
+.v3-actions-buttons button.v3-action-advance{
+ background:#2c392f;border-color:#bfae8470;color:#e2ce9e;
+}
+.v3-time-controls{border-top:1px solid #60796a36}
+.v3-current-clock strong{color:#decda6;font-size:15px}
+.v3-shell .v3-time-options button{
+ border-radius:6px;background:transparent;
+ border:1px solid #52675c78;
+ color:#bfcbc1;min-height:32px;
+}
+.v3-shell .v3-time-options button:hover:not(:disabled){background:#243b33}
+.v3-journal-toggle{border-radius:6px;background:transparent}
+.v3-panel,.v3-dev-details{
+ border-radius:8px;box-shadow:none;
+}
+@media(max-width:1000px){
+ .v3-play-layout{grid-template-columns:205px minmax(0,1fr);gap:18px;padding:0 12px}
+ .v3-quest-sidebar{padding-right:12px}
+}
+@media(max-width:740px){
+ .v3-play-layout{display:flex;flex-direction:column;padding:0 10px}
+ .v3-quest-sidebar{border:1px solid var(--v3-line);border-radius:8px;
+   padding:14px;margin-top:9px;background:#142527}
+ .v3-main-story .v3-messages{padding:0 11px 25px}
+ .v3-main-story .v3-compose{padding:12px 9px}
+ .v3-assistant{padding:12px 1px 17px}
+ .v3-user{padding:13px 1px 16px}
+ .v3-content{font-size:14px;line-height:2.02}
+ .v3-header{padding:13px 15px}
+ .v3-header-nav{background:transparent}
+ .v3-brand-symbol{width:35px;height:35px}
+ .v3-story-header,.v3-main-story .v3-story-header{padding-top:22px}
+}
