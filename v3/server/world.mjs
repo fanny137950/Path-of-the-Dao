@@ -199,15 +199,16 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[]};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[]};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null,schedules=[],newNPCs=[];
+ let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[];
  try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
   if(parsed.move&&typeof parsed.move==='object')move=parsed.move;
   if(Array.isArray(parsed.schedules))schedules=parsed.schedules.slice(0,2);
-  if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);}
+  if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);
+  if(Array.isArray(parsed.taskUpdates))taskUpdates=parsed.taskUpdates.slice(0,5);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates};
 }
 function applyChanges(next,changes,text,narration,present){
  const evidenceText=text+'\n'+narration;
@@ -216,6 +217,9 @@ function applyChanges(next,changes,text,narration,present){
   const actor=next.npcs[change.id],quote=shorten(change.evidence,100);
   if(!actor||quote.length<2||!evidenceText.includes(quote))continue;
   if(MOODS.includes(change.mood))actor.mood=change.mood;
+  if(CONDITIONS.includes(change.status))actor.status=change.status;
+  if(typeof change.goal==='string'&&change.goal.trim()&&change.goal.length<=180&&
+     actor.goal!==change.goal.trim())actor.goal=change.goal.trim();
   if(change.relationship&&typeof change.relationship==='object'){
    for(const field of ['favor','trust','respect']){
     const delta=change.relationship[field];
@@ -223,6 +227,31 @@ function applyChanges(next,changes,text,narration,present){
      actor.relationships.player[field]=clamp(actor.relationships.player[field]+delta);
    }
   }
+ }
+}
+/**
+ * Task status is a progress note, not an authority to advance a scheduled
+ * stage early. Only actual narrated evidence and existing task IDs may write.
+ */
+function applyTaskUpdates(next,updates,narration){
+ const now=elapsedMinutes(next);
+ for(const change of updates){
+  if(!change||typeof change!=='object'||typeof change.id!=='string')continue;
+  const event=next.eventCalendar?.events?.find(e=>e.id===change.id);
+  if(!event||event.state==='cancelled')continue;
+  const evidence=shorten(change.evidence,120);
+  const note=shorten(change.note,220);
+  if(evidence.length<4||!narration.includes(evidence)||!note)continue;
+  if(!['進行中','受阻','完成','失敗','取得進展'].includes(change.status))continue;
+  // No invented completion of a future stage / deadline: this status is
+  // a scoped narrative note. Scheduled completion remains clock-owned.
+  const record={id:'task-update:'+next.revision+':'+event.id,
+   at:now,day:next.day,minute:next.minute,
+   status:change.status,note,evidence};
+  event.progressLog??=[];
+  if(event.progressLog.some(x=>x.id===record.id))continue;
+  event.progressLog.push(record);
+  event.progressLog=event.progressLog.slice(-30);
  }
 }
 export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
@@ -268,6 +297,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
    source:'現場',text:shorten('洛河：'+userText+'；當時：'+parsed.narration,420)});
  }
  applyChanges(next,parsed.changes,userText,parsed.narration,present);
+ applyTaskUpdates(next,parsed.taskUpdates,parsed.narration);
  // Only valid complete plans become authoritative. Rejected suggestions cannot
  // rewrite existing calendar events or invalidate an otherwise valid dialogue.
  for(const proposal of parsed.schedules){
