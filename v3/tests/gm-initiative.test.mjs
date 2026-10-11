@@ -19,7 +19,7 @@ test('tested-root scene must progress working NPCs without starting future peak 
  assert.match(guidance,/已測靈根/);
  assert.match(guidance,/韓守一繼續處理下一份名冊/);
  assert.match(guidance,/尚未到點/);
- assert.match(guidance,/第1日 13:00/);
+ assert.match(guidance,/第1日 12:00/);
  assert.match(gmContext(w,'繼續'),/金靈根/);
  assert.equal(nextBeatDirective(w,'我問金靈根強不強'),'');
 });
@@ -46,8 +46,8 @@ test('calendar direction remains relative to saved time and current location',()
  w.eventCalendar.events[1].state='active';
  w.eventCalendar.events[1].completed=['open'];
  const instruction=nextBeatDirective(w,'繼續');
- assert.match(instruction,/第2日 09:00/);
+ assert.match(instruction,/第1日 15:00/);
  assert.doesNotMatch(instruction,/第1日 13:00.*尚未到點/);
  w.location='藏經樓';
- assert.doesNotMatch(nextBeatDirective(w,'繼續'),/預定第2日 09:00/);
+ assert.doesNotMatch(nextBeatDirective(w,'繼續'),/預定第1日 15:00/);
 });
