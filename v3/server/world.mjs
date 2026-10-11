@@ -13,9 +13,7 @@ import {initialEventCalendar,ensureEventCalendar,addScheduledEvent,advanceEventC
 import {BUILTIN_EVENT_TEMPLATES,eventSourceCategory,GAME_YEAR_DAYS} from './event-templates.mjs';
 import {initialNPCAgency,ensureNPCAgency,advanceNPCAgency,npcAgencyForGM} from './npc-agency.mjs';
 import {registerNamedNPCs} from './npc-registration.mjs';
-import {replanNPCAgendas,npcDecisionContext} from './npc-decision-v2.mjs';
 import {ensureDailyTick,settleWorldDays,dailyTickForGM} from './world-daily-tick.mjs';
-import {advanceNPCDailyPlans,npcDailyPlanForGM} from './npc-daily-planner.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -179,8 +177,6 @@ export function gmContext(world,userText){
   episodicMemoriesForGM(world,userText,850),
   eventCalendarForGM(world,650),
   npcAgencyForGM(world,400),
-  npcDecisionContext(world,180),
-  npcDailyPlanForGM(world,240),
   dailyTickForGM(world,150),
   worldPlanForGM(world).slice(0,200),
   ('【較遠的重要舊事（GM核對用，非所有NPC共有記憶）】\n'+durable).slice(0,500),
@@ -281,9 +277,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  updateDurableMemory(next,next.events.find(e=>e.id===eventId));
  advanceLivingWorld(next,before,after);
  advanceNPCAgency(next,before,after);
- replanNPCAgendas(next,before,after);
  settleWorldDays(next,before,after);
- advanceNPCDailyPlans(next,before,after);
  maybeWriteChapter(next);
  return next;
 }
