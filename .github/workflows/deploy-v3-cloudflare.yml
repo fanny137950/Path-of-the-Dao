@@ -1,0 +1,84 @@
+name: Deploy V3 to Cloudflare
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: '輸入 wendao-living-world 才允許覆蓋現有 Worker'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wendao-cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirmation == 'wendao-living-world' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WENDAO_WORKER_NAME: wendao-living-world
+    steps:
+      - name: Checkout V3 game branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/ensemble-story-deployment
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.25.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test V3 OpenAI adapter
+        run: node --test v3/tests/*.test.mjs
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Build game
+        run: npm run build
+
+      - name: Confirm existing Cloudflare Worker and D1 database
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing GitHub secret CLOUDFLARE_API_TOKEN'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing GitHub secret CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+          [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[a-fA-F0-9]{32}$ ]] || { echo 'Cloudflare account ID invalid'; exit 1; }
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          curl --fail --silent --show-error --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "$API/workers/scripts/$WENDAO_WORKER_NAME/settings"             | jq -e '.success == true' > /dev/null             || { echo 'Existing Worker not found; deployment cancelled'; exit 1; }
+          DATA=$(curl --fail --silent --show-error --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "$API/d1/database?name=$WENDAO_WORKER_NAME")
+          COUNT=$(jq --arg name "$WENDAO_WORKER_NAME" '[.result[] | select(.name == $name)] | length' <<< "$DATA")
+          [[ "$COUNT" == '1' ]] || { echo 'Existing D1 database must match exactly once; deployment cancelled'; exit 1; }
+          DATABASE_ID=$(jq -r --arg name "$WENDAO_WORKER_NAME" '.result[] | select(.name == $name) | .uuid' <<< "$DATA")
+          [[ "$DATABASE_ID" =~ ^[a-fA-F0-9-]{36}$ ]] || { echo 'Invalid D1 database UUID'; exit 1; }
+          echo "WENDAO_D1_DATABASE_ID=$DATABASE_ID" >> "$GITHUB_ENV"
+          echo 'Existing Worker and D1 database verified.'
+
+      - name: Prepare standalone Wrangler config
+        run: node scripts/prepare-cloudflare.mjs
+
+      # No D1 migrations or credential changes: this release replaces only the
+      # Worker code and static assets, preserving existing login secrets and data.
+      - name: Deploy Worker and assets
+        run: pnpm exec wrangler deploy --config dist/server/wrangler.standalone.json
+
+      - name: Smoke-test site
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -sS -L -o /dev/null -w '%{http_code}' --max-time 30             https://wendao-living-world.danew137950.workers.dev/)
+          [[ "$STATUS" == '200' ]] || { echo "Site returned HTTP $STATUS"; exit 1; }
+          echo 'Deployed V3 site is responding.'
