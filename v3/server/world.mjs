@@ -8,6 +8,7 @@ import {loreForGM,npcPortraitForGM} from './lore-retrieval.mjs';
 import {suggestedActions} from './action-suggestions.mjs';
 import {playerQuestJournal} from './player-journal.mjs';
 import {sceneConversationForGM,episodicMemoriesForGM} from './conversation-memory.mjs';
+import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory} from './durable-memory.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -41,7 +42,7 @@ export function initialV3World(id){
    family:clone(WORLD_BIBLE.protagonist.family),
    aptitude:{grade:'未知',description:'尚未完成靈根與資質測試；不能僅因往昔世界線直接認定。'},
    realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
+  npcs:clone(NPCS),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
 }
 export function validatedWorld(value){
  if(!value||value.mode!=='v3'||!Array.isArray(value.messages)||!Array.isArray(value.events)
@@ -54,6 +55,7 @@ export function validatedWorld(value){
  value.protagonist.family??=clone(WORLD_BIBLE.protagonist.family);
  value.protagonist.aptitude??={grade:'未知',description:'尚未完成完整資質評估'};
  value.living??=initialLivingWorld();
+ hydrateDurableMemory(value);
  value.scene??=sceneOf(value);
  value.developerAudit??=[];
  for(const [id,defaults] of Object.entries(NPCS)){
@@ -124,6 +126,7 @@ export function gmContext(world,userText){
    '\n【只有'+actor.name+'經歷或獲知的事件】'+(memory||'沒有相關舊事')+'。'+notes;
  }).join('\n');
 
+ const durable=recallDurableMemory(world,userText,{limit:5,maxChars:1250});
  const chapters=recallChapters(world,userText,3)
   .map(c=>'【舊章節第'+c.from+'—'+c.to+'回合】'+shorten(c.text,650)).join('\n');
  const expectedRoot=pendingRootResult(world,userText);
@@ -138,8 +141,9 @@ export function gmContext(world,userText){
   loreForGM(world,userText,2050),
   people.slice(0,2300),
   worldPlanForGM(world).slice(0,680),
-  chapters.slice(0,400),
-  episodicMemoriesForGM(world,userText,1450),
+  ('【長期重要經歷（依存檔原話，不代表每個NPC都知情）】\n'+durable).slice(0,1300),
+  chapters.slice(0,280),
+  episodicMemoriesForGM(world,userText,1100),
   sceneConversationForGM(world,userText,4700),
   '【洛河最新輸入】'+userText,
   rootRule,
@@ -227,6 +231,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
    source:'現場',text:shorten('洛河：'+userText+'；當時：'+parsed.narration,420)});
  }
  applyChanges(next,parsed.changes,userText,parsed.narration,present);
+ updateDurableMemory(next,next.events.find(e=>e.id===eventId));
  advanceLivingWorld(next,before,after);
  maybeWriteChapter(next);
  return next;
