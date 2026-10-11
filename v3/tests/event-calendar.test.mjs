@@ -33,8 +33,9 @@ test('new events must be planned with ordered stages and a valid deadline',()=>{
   location:'太虛宗山門',start:600,end:810,participants:['registrar'],
   stages:[{id:'depart',at:600,title:'接到委託',detail:'韓守一派出接引弟子'},
    {id:'limit',at:810,title:'提交期限',detail:'未完成將交給其他弟子'}]};
+ const count=world.eventCalendar.events.length;
  addScheduledEvent(world,planned,world.minute);
- assert.equal(world.eventCalendar.events.length,3);
+ assert.equal(world.eventCalendar.events.length,count+1);
  assert.throws(()=>addScheduledEvent(world,planned,world.minute),/重複/);
  assert.throws(()=>addScheduledEvent(initialV3World('bad'),{...planned,start:100},480),/時間/);
  assert.throws(()=>addScheduledEvent(initialV3World('bad2'),{...planned,
@@ -52,12 +53,13 @@ test('GM may propose timed mission in validated structured metadata',()=>{
  const raw='韓守一將事情記入待辦名冊。\n<!--GM_STATE:'+JSON.stringify({schedules:[proposal]})+'-->';
  const parsed=parseGMResult(raw);
  assert.equal(parsed.schedules.length,1);
+ const count=world.eventCalendar.events.length;
  const after=commitV3Turn(world,'請說說今日的工作',raw,'calendar-gm-1');
- assert.equal(after.eventCalendar.events.length,3);
- assert.equal(after.eventCalendar.events[2].end,780);
+ assert.equal(after.eventCalendar.events.length,count+1);
+ assert.equal(after.eventCalendar.events.find(e=>e.id==='herb-job-1').end,780);
  assert.equal(after.messages.at(-1).content,'韓守一將事情記入待辦名冊。');
  const reloaded=validatedWorld(JSON.parse(JSON.stringify(after)));
- assert.equal(reloaded.eventCalendar.events[2].id,'herb-job-1');
+ assert.ok(reloaded.eventCalendar.events.some(e=>e.id==='herb-job-1'));
  assert.match(eventCalendarForGM(reloaded),/藥材交付/);
 });
 
@@ -66,8 +68,9 @@ test('invalid GM schedule never enters canonical state',()=>{
  const raw='韓守一說會再查。\n<!--GM_STATE:'+JSON.stringify({schedules:[{
    id:'bad-no-times',name:'永遠不結束的任務',type:'任務',location:'太虛宗山門',
    start:510,end:500,participants:['registrar'],stages:[]} ]})+'-->';
+ const initial=world.eventCalendar.events.length;
  const after=commitV3Turn(world,'有新工作嗎',raw,'calendar-invalid-1');
- assert.equal(after.eventCalendar.events.length,2);
+ assert.equal(after.eventCalendar.events.length,initial);
 });
 
 test('loading older worlds does not replay elapsed scheduled milestones',()=>{
