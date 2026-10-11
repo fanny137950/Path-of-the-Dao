@@ -45,14 +45,14 @@ export function settleWorldDays(world,from,to){
   for(let day=firstDay;day<=lastDay;day++)days.push(day);
  }else{
   const checkpoints=due.filter(x=>x.event.completed?.includes(x.stage.id))
-   .map(x=>Math.floor(x.stage.at/DAY)+1)
+   .map(x=>Math.floor(x.stage.at/DAY)+2)
    .filter(d=>d>=firstDay&&d<=lastDay);
   days=unique([firstDay,...checkpoints.slice(0,10),lastDay]).sort((a,b)=>a-b);
  }
  for(let i=0;i<days.length;i++){
   const day=days[i],rangeStart=i===0?firstDay:days[i-1]+1;
-  const startAbs=Math.max(from,(rangeStart-1)*DAY);
-  const endAbs=Math.min(to,day*DAY);
+  const startAbs=i===0?from:(days[i-1]-1)*DAY;
+  const endAbs=Math.min(to,(day-1)*DAY);
   // Group a long quiet interval; use exact event timestamps in output,
   // rather than pretending all events happened on the last day.
   const records=crossed.filter(e=>at(e)>startAbs&&at(e)<=endAbs);
@@ -63,7 +63,7 @@ export function settleWorldDays(world,from,to){
     !completed(e)&&e.start<endAbs&&e.end>startAbs);
   const record={
    id:'daily:'+day,day,rangeStartDay:rangeStart,rangeEndDay:day,
-   at:Math.min(day*DAY,to),type:'world-daily-tick',
+   at:Math.min((day-1)*DAY,to),type:'world-daily-tick',
    calendarEvents:calendarIds,
    npcActivity:npcIds,
    livingArcs:arcIds,
