@@ -46,7 +46,7 @@ export function initialV3World(id){
    family:clone(WORLD_BIBLE.protagonist.family),
    aptitude:{grade:'未知',description:'尚未完成靈根與資質測試；不能僅因往昔世界線直接認定。'},
    realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),npcAgency:null,eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
+  npcs:clone(NPCS),npcAgency:null,eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION,legacyNPCBackfillVersion:1};
  initial.npcAgency=initialNPCAgency(initial);
  return initial;
 }
@@ -79,6 +79,16 @@ export function validatedWorld(value){
   c.knowledge=Array.isArray(c.knowledge)?c.knowledge:[];
   c.privateNotes=Array.isArray(c.privateNotes)?c.privateNotes:[];
   c.relationships={player:{...relationship(),...c.relationships?.player}};
+ }
+ // One-time conservative migration for earlier saved games in which named
+ // speakers such as 葉沖 introduced themselves but were never written to D1.
+ // Do not reconstruct unverifiable private backgrounds or replay old events.
+ if(value.legacyNPCBackfillVersion!==1){
+  for(const m of value.messages.slice(-80)){
+   if(m.role==='assistant'&&!isNonNarrative(m.content))
+    registerNamedNPCs(value,visibleNarrative(m.content),[]);
+  }
+  value.legacyNPCBackfillVersion=1;
  }
  ensureNPCAgency(value);
  return value;
