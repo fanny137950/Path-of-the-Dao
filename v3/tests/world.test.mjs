@@ -89,6 +89,25 @@ test('developer patches are audited and do not mutate old world',()=>{
  assert.equal(next.npcs.shen.cultivationProgress,42);
  assert.equal(next.npcs.shen.privateNotes[0],'曾察覺異常氣息');
  assert.equal(next.developerAudit.at(-1).operation,'character-edit');
- assert.throws(()=>editCharacter(w,'shen',{realm:'化神'},''),/不允許/);
+ assert.equal(editCharacter(w,'shen',{realm:'化神初期'},'測試').npcs.shen.realm,'化神初期');
+ assert.throws(()=>editCharacter(w,'shen',{realm:'化神無上境'},''),/無效修為/);
+ assert.throws(()=>editCharacter(w,'shen',{password:'x'},''),/不允許/);
  assert.throws(()=>editCharacter(w,'shen',{relationship:{trust:200}},''),/關係值/);
+});
+
+test('travel is only committed after player choice and validated arrival evidence',()=>{
+ const w=initialV3World('travel');
+ const prose='洛河沿石階走上山，終於抵達棲風峰。';
+ const marked=prose+'\n<!--GM_STATE:{"move":{"to":"棲風峰","evidence":"終於抵達棲風峰"},"changes":[]}-->';
+ const yes=commitV3Turn(w,'我前往棲風峰',marked,'req-go');
+ assert.equal(yes.location,'棲風峰');
+ assert.equal(yes.minute,510);
+ assert.equal(yes.events[0].destination,'棲風峰');
+ assert.equal(yes.npcs.registrar.memories.length,1);
+ assert.equal(yes.npcs.shen.memories.length,0);
+ assert.ok(gmContext(yes,'請問有人在嗎').includes('沈滄月'));
+ const no=commitV3Turn(w,'我待在原地',marked,'req-no');
+ assert.equal(no.location,'太虛宗山門');
+ const fake=commitV3Turn(w,'我前往棲風峰','執事不同意。\n<!--GM_STATE:{"move":{"to":"棲風峰","evidence":"終於抵達棲風峰"}}-->', 'req-fake');
+ assert.equal(fake.location,'太虛宗山門');
 });
