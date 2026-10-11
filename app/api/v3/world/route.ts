@@ -8,6 +8,8 @@ import {generateGMResponse} from '../../../../v3/server/openai.mjs';
 import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
 // @ts-ignore - conservative objective-action stability filter
 import {stabilizeDecisiveAction} from '../../../../v3/server/outcome-stability.mjs';
+// @ts-ignore - backend-only GM initiative director
+import {nextBeatDirective,assessContinueReply,retryContinueDirective,isContinueIntent} from '../../../../v3/server/gm-initiative.mjs';
 
 export const dynamic='force-dynamic';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -118,6 +120,7 @@ export async function POST(request:Request){
   if(key.length>300)return reply({error:'API Key 無效'},400);
   const model=typeof body.model==='string'?body.model:undefined;
   let answer:string,usage:null|{totalTokens?:number}=null;
+  const progressionDirective=!isTimeAdvance?nextBeatDirective(world,text):'';
   if(mode==='demo')answer=isTimeAdvance
    ?'洛河在原處等待，時間緩緩流逝。來往弟子換了幾批，周遭的宗務照常運作。\n\n（示範模式不會產生動態 NPC 對話，請使用 AI 模式體驗故事。）'
    :'韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
@@ -125,11 +128,22 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:key,instructions:instructions+timeDirective,input:gmContext(world,text),maxOutputTokens:1000};
-   const result=mode==='openrouter'
-    ?await generateOpenRouterResponse({...args,model:model||'openrouter/free'})
-    :await generateGMResponse({...args,model:model||'gpt-4.1-mini'});
+   const args={apiKey:key,instructions:instructions+timeDirective+progressionDirective,input:gmContext(world,text),maxOutputTokens:1000};
+   const generate=(instruction:string)=>mode==='openrouter'
+    ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
+    :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
+   const result=await generate(args.instructions);
    answer=result.text;usage=result.usage;
+   const quality=assessContinueReply(text,answer);
+   if(!quality.ok&&isContinueIntent(text)){
+    // Draft is never saved. Retry only clearly stalled "繼續" turns, at most once.
+    const retry=await generate(args.instructions+retryContinueDirective(quality));
+    answer=retry.text;
+    usage={totalTokens:(result.usage?.totalTokens||0)+(retry.usage?.totalTokens||0)};
+    if(!assessContinueReply(text,answer).ok){
+     return reply({error:'GM 這回合仍停在重複提問，未寫入存檔。請重試「繼續」，不會消耗遊戲時間。'},502);
+    }
+   }
   }
   answer=stabilizeDecisiveAction(world,text,answer);
   const next=commitV3Turn(world,text,answer,body.requestId,isTimeAdvance?{advanceMinutes:requestedMinutes}:{});
