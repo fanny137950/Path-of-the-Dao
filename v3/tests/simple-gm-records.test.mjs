@@ -14,11 +14,11 @@ test('GM follows original roleplay contract, records instead of driving plot',()
 });
 test('narrated NPC changes and task progress are saved independently',()=>{
  const world=initialV3World('simple-gm-record');
- const story='韓煜被洛河一拳打中臉頰，韓守一皺眉，神情不悅。他決定重新核對名冊。';
+ const story='韓煜被洛河一拳打中臉頰，韓守一出面勸阻時被推倒擦傷。韓守一皺眉，神情不悅，決定重新核對名冊。';
  const answer=story+'\n<!--GM_STATE:'+JSON.stringify({
-  changes:[{id:'registrar',mood:'不悅',status:'輕傷',goal:'重新核對名冊',evidence:'韓守一皺眉，神情不悅'}],
+  changes:[{id:'registrar',mood:'不悅',status:'輕傷',goal:'重新核對名冊',evidence:'韓守一出面勸阻時被推倒擦傷。韓守一皺眉，神情不悅，決定重新核對名冊'}],
   taskUpdates:[{id:'sect-recruitment',status:'受阻',note:'現場短暫混亂，執事需要重新核對名冊',
-   evidence:'他決定重新核對名冊'}]
+   evidence:'決定重新核對名冊'}]
  })+'-->';
  const next=commitV3Turn(world,'我去跟韓守一講話',answer,'simple-gm-record-1');
  assert.equal(next.npcs.registrar.mood,'不悅');
