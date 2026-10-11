@@ -40,9 +40,10 @@ export default function V3DeveloperPanel({
   setLoading(true);setError('');
   fetch('/api/v3/world?world='+encodeURIComponent(worldId)+'&view=developer',{cache:'no-store',signal:abort.signal})
    .then(async res=>{
-    const data=await res.json();
+    const data=await res.json() as DeveloperData & {error?:string};
     if(!res.ok)throw Error(data.error||'無法載入開發者資訊');
-    return data as DeveloperData;
+    if(!data.characters||!data.world)throw Error('開發者資料格式錯誤');
+    return data;
    }).then(value=>{if(!abort.signal.aborted)setData(value)})
    .catch(e=>{if(!abort.signal.aborted)setError(e instanceof Error?e.message:'讀取失敗')})
    .finally(()=>{if(!abort.signal.aborted)setLoading(false)});
@@ -65,10 +66,11 @@ export default function V3DeveloperPanel({
    };
    const res=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({op:'edit-character',world:worldId,revision:data.revision,actor:actor.id,patch,note:'由開發者面板編輯'})});
-   const result=await res.json();
+   const result=await res.json() as {error?:string;developer?:DeveloperData;world?:WorldView};
    if(!res.ok)throw Error(result.error||'儲存失敗');
-   setData(result.developer as DeveloperData);
-   onWorldChange(result.world as WorldView);
+   if(!result.developer||!result.world)throw Error('儲存回應格式錯誤');
+   setData(result.developer);
+   onWorldChange(result.world);
    setNotice('人物設定已存入 D1，並留下修改紀錄。');
   }catch(e){setError(e instanceof Error?e.message:'儲存失敗')}
   finally{setSaving(false)}
