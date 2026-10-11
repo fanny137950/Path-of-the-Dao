@@ -82,5 +82,5 @@ test('legacy invalid committed output remains in D1 history but is hidden from p
  assert.equal(w.messages.at(-1).content,'User Safety: safe');
  const prompt=gmContext(w,'我再看一下');
  assert.doesNotMatch(prompt,/User Safety: safe/);
- assert.match(prompt,/洛河最新行動/);
+ assert.match(prompt,/洛河最新輸入/);
 });
