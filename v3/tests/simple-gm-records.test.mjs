@@ -50,7 +50,7 @@ test('unsupported claims and unknown tasks cannot rewrite records',()=>{
  assert.notEqual(next.npcs.registrar.goal,'無期限離開宗門');
  assert.equal(next.npcs.shen.mood,world.npcs.shen.mood);
  assert.equal(next.eventCalendar.events[0].progressLog,undefined);
- assert.equal(next.eventCalendar.events[0].state,'scheduled');
+ assert.equal(next.eventCalendar.events[0].state,'active'); // The clock advances normally after 08:00.
  assert.equal(parseGMResult('單純對話').taskUpdates.length,0);
 });
 test('existing NPC memories and clock remain readable when legacy daily plans exist',()=>{
