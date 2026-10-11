@@ -14,12 +14,14 @@ export function isDecisiveAttack(text){return ATTACK.test(String(text||'').trim(
 export function assessActionResolution(text,answer){
  if(!isDecisiveAttack(text))return {ok:true,reason:'not-action'};
  const narrative=visibleNarrative(answer||'').trim();
+ // Claims inside NPC speech ('先試試你的拳頭') cannot adjudicate a hit.
+ const observable=narrative.replace(/「[^」]*」|『[^』]*』/gu,'');
  if(!narrative)return {ok:false,reason:'empty-action'};
  // Reject pure taunting/permission loops: they contain combat vocabulary but
  // no resolved attempt, defense or concrete intervention.
- if(STALL.test(narrative)&&!REAL_ACTION.test(narrative))
+ if(STALL.test(narrative)&&!REAL_ACTION.test(observable))
   return {ok:false,reason:'stalling-attack'};
- if(!ADJUDICATED.test(narrative)||!REAL_ACTION.test(narrative))
+ if(!ADJUDICATED.test(observable)||!REAL_ACTION.test(observable))
   return {ok:false,reason:'no-action-outcome'};
  return {ok:true,reason:'adjudicated'};
 }
