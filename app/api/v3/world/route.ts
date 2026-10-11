@@ -1,7 +1,7 @@
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../../chatgpt-auth';
 // @ts-ignore - module is authored in JS
-import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commitV3Turn,editCharacter} from '../../../../v3/server/world.mjs';
+import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commitV3Turn,editCharacter,developerTaskChange} from '../../../../v3/server/world.mjs';
 // @ts-ignore - module is authored in JS
 import {generateGMResponse} from '../../../../v3/server/openai.mjs';
 // @ts-ignore - module is authored in JS
@@ -75,7 +75,7 @@ export async function POST(request:Request){
     .bind(id,user.userId,'問道九州 V3 · 洛河',0,JSON.stringify(world),new Date().toISOString()).run();
    return reply(playerWorld(world),201);
   }
-  if(!['turn','advance-time','edit-character'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
+  if(!['turn','advance-time','edit-character','manage-task'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
   const world=await readWorld(body.world,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
   if(body.op==='edit-character'){
@@ -84,6 +84,17 @@ export async function POST(request:Request){
    let next;
    try{next=editCharacter(world,body.actor,body.patch,body.note,user.userId);}
    catch(e){return reply({error:e instanceof Error?e.message:'人物設定無效'},400);}
+   const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
+    .bind(JSON.stringify(next),next.revision,world.id,user.userId,world.revision).run();
+   if(result.meta.changes!==1)return reply({error:'世界資料已更新，請重試'},409);
+   return reply({world:playerWorld(next),developer:developerWorld(next)});
+  }
+  if(body.op==='manage-task'){
+   if(!isDeveloper(user.userId))return reply({error:'無權管理任務'},403);
+   if(body.revision!==world.revision)return reply({error:'世界版本已更新，請重新載入任務'},409);
+   let next;
+   try{next=developerTaskChange(world,body.action,body.task,user.userId);}
+   catch(e){return reply({error:e instanceof Error?e.message:'任務資料無效'},400);}
    const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
     .bind(JSON.stringify(next),next.revision,world.id,user.userId,world.revision).run();
    if(result.meta.changes!==1)return reply({error:'世界資料已更新，請重試'},409);
