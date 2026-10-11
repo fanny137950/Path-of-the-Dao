@@ -8,7 +8,7 @@ test('initial recruitment provides useful non-rail options and GM forward',()=>{
  const w=initialV3World('suggestions-intro');
  const list=suggestedActions(w);
  assert.ok(list.some(x=>x.label==='開始靈根測試'));
- assert.ok(list.some(x=>x.label==='詢問收徒方式'));
+ assert.ok(!list.some(x=>x.label==='詢問收徒方式'));
  assert.ok(list.some(x=>x.label==='交給 GM 推進'&&x.text==='繼續'));
  assert.ok(list.length<=4);
  assert.deepEqual(playerWorld(w).suggestions,list);
@@ -26,7 +26,7 @@ test('after NPC invites the player to touch the spirit stone, action really conc
  w=commitV3Turn(w,button.text,'測靈石亮起。韓守一道：「你的靈根是'+root+'。」','req2');
  assert.equal(w.protagonist.spiritualRoot,root);
  assert.ok(!suggestedActions(w).some(x=>x.label==='將手放上測靈石'));
- assert.ok(suggestedActions(w).some(x=>x.label==='詢問測試結果'));
+ assert.ok(!suggestedActions(w).some(x=>x.label==='詢問測試結果'));
 });
 
 test('options never depend on secret NPC memory or offscreen event truth',()=>{

@@ -93,6 +93,8 @@ export function developerWorld(world){
   location:world.location,bibleVersion:WORLD_BIBLE_VERSION,
   worldBible:clone(WORLD_BIBLE),protagonist:clone(world.protagonist),
   characters:clone(world.npcs),events:clone(world.events.slice(-25)),
+  eventCalendar:clone(ensureEventCalendar(world)),
+  livingArcs:clone(world.living?.arcs||[]),
   audit:clone((world.developerAudit||[]).slice(-25))};
 }
 const presentIds=world=>Object.keys(world.npcs).filter(id=>world.npcs[id].where===world.location);
@@ -290,5 +292,30 @@ export function editCharacter(world,id,patch,note,by='developer'){
  next.developerAudit??=[];
  next.developerAudit.push({revision:next.revision,actorId:id,operation:'character-edit',by,
  day:next.day,minute:next.minute,fields:Object.keys(patch),note:shorten(note,120)});
+ return next;
+}
+
+/** Developer-only actions. API must enforce authorization before invocation. */
+export function developerTaskChange(world,action,payload,by='developer'){
+ if(!['create','cancel'].includes(action))throw Error('不支援的任務操作');
+ const next=clone(world),now=elapsedMinutes(world);
+ let event;
+ if(action==='create'){
+  event=addScheduledEvent(next,payload,now);
+ }else{
+  if(typeof payload?.id!=='string')throw Error('任務 ID 無效');
+  const entry=ensureEventCalendar(next).events.find(e=>e.id===payload.id);
+  if(!entry)throw Error('找不到指定任務');
+  if(entry.state==='completed'||entry.state==='cancelled')throw Error('已結束任務不能重複取消');
+  entry.state='cancelled';
+  entry.cancelledAt=now;
+  event=entry;
+ }
+ next.revision++;
+ next.developerAudit??=[];
+ next.developerAudit.push({revision:next.revision,actorId:'calendar:'+event.id,
+  operation:'task-'+action,by,day:next.day,minute:next.minute,
+  fields:action==='create'?['id','name','start','end','stages','participants']:['state'],
+  note:action==='create'?'開發者建立事件時間表':'開發者取消未完成事件'});
  return next;
 }
