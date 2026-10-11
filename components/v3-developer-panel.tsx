@@ -40,6 +40,7 @@ export default function V3DeveloperPanel({
  const [data,setData]=useState<DeveloperData|null>(null);
  const [selected,setSelected]=useState('registrar');
  const [characterSearch,setCharacterSearch]=useState('');
+ const [openedGroups,setOpenedGroups]=useState<Record<string,boolean>>({});
  const [draft,setDraft]=useState<Draft|null>(null);
  const [error,setError]=useState('');const [notice,setNotice]=useState('');
  const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);
@@ -107,19 +108,25 @@ export default function V3DeveloperPanel({
     <div className="v3-dev-directory-tools">
      <label htmlFor="v3-character-search">搜尋人物／山峰／境界／資質</label>
      <input id="v3-character-search" type="search" value={characterSearch}
-      onChange={e=>setCharacterSearch(e.target.value)}
+      onChange={e=>{setCharacterSearch(e.target.value);setOpenedGroups({})}}
       placeholder="例如：沈滄月、築基、棲風峰"
       aria-label="搜尋人物姓名、宗門、境界、靈根與資質"/>
      <p aria-live="polite">第 {data.day} 日 · 顯示 {matchedCharacters}／{totalCharacters} 位 NPC</p>
     </div>
     {directory.length===0?<p className="v3-dev-empty">找不到符合條件的人物，請嘗試其他關鍵字。</p>
     :directory.map(faction=><details key={faction.id+(characterSearch.trim()?':search':'')} 
-      className="v3-dev-faction" defaultOpen={faction.id==='taixu'||Boolean(characterSearch.trim())}>
+      className="v3-dev-faction"
+      open={openedGroups[faction.id]??(faction.id==='taixu'||Boolean(characterSearch.trim()))}
+      onToggle={e=>{const expanded=e.currentTarget.open;setOpenedGroups(prev=>
+       prev[faction.id]===expanded?prev:{...prev,[faction.id]:expanded})}}>
       <summary>{faction.name}<span>{faction.count} 人</span></summary>
       <div className="v3-dev-peaks">
        {faction.sections.map(section=><details key={section.id+(characterSearch.trim()?':search':'')}
         className="v3-dev-peak"
-        defaultOpen={Boolean(characterSearch.trim())||section.id==='山門'||section.id==='棲風峰'}>
+        open={openedGroups[faction.id+':'+section.id]??(
+         Boolean(characterSearch.trim())||section.id==='山門'||section.id==='棲風峰')}
+        onToggle={e=>{const expanded=e.currentTarget.open;const key=faction.id+':'+section.id;
+         setOpenedGroups(prev=>prev[key]===expanded?prev:{...prev,[key]:expanded})}}>
         <summary>{section.name}<span>{section.count}</span></summary>
         <div className="v3-dev-rank-groups">
          {section.ranks.map(rank=><div className="v3-dev-rank" key={rank.id}>
