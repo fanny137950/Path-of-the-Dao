@@ -1,0 +1,33 @@
+name: Verify V3 Character and Memory
+on:
+  pull_request:
+    branches:
+      - codex/ensemble-story-deployment
+    paths:
+      - 'app/v3/**'
+      - 'app/api/v3/**'
+      - 'components/v3-developer-panel.tsx'
+      - 'v3/**'
+      - '.github/workflows/v3-character-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pnpm
+        run: npm install --global pnpm@11.25.0
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test character, memory and AI adapters
+        run: node --test v3/tests/*.test.mjs
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+      - name: Build
+        run: npm run build
