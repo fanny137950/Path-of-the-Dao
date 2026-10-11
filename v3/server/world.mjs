@@ -14,6 +14,7 @@ import {BUILTIN_EVENT_TEMPLATES,eventSourceCategory,GAME_YEAR_DAYS} from './even
 import {initialNPCAgency,ensureNPCAgency,advanceNPCAgency,npcAgencyForGM} from './npc-agency.mjs';
 import {registerNamedNPCs} from './npc-registration.mjs';
 import {replanNPCAgendas,npcDecisionContext} from './npc-decision-v2.mjs';
+import {ensureDailyTick,settleWorldDays,dailyTickForGM} from './world-daily-tick.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -49,6 +50,7 @@ export function initialV3World(id){
    realm:'凡人',spiritualRoot:'未測定'},
   npcs:clone(NPCS),npcAgency:null,eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION,legacyNPCBackfillVersion:1};
  initial.npcAgency=initialNPCAgency(initial);
+ ensureDailyTick(initial);
  return initial;
 }
 export function validatedWorld(value){
@@ -92,6 +94,7 @@ export function validatedWorld(value){
   value.legacyNPCBackfillVersion=1;
  }
  ensureNPCAgency(value);
+ ensureDailyTick(value);
  return value;
 }
 export function playerWorld(world){
@@ -111,6 +114,7 @@ export function developerWorld(world){
   worldBible:clone(WORLD_BIBLE),protagonist:clone(world.protagonist),
   characters:clone(world.npcs),events:clone(world.events.slice(-25)),
   npcAgency:clone(ensureNPCAgency(world)),
+  dailyTick:clone(ensureDailyTick(world)),
   eventCalendar:clone(ensureEventCalendar(world)),
   eventTemplates:clone(BUILTIN_EVENT_TEMPLATES),gameYearDays:GAME_YEAR_DAYS,
   livingArcs:clone(world.living?.arcs||[]),
@@ -170,6 +174,7 @@ export function gmContext(world,userText){
   eventCalendarForGM(world,850),
   npcAgencyForGM(world,650),
   npcDecisionContext(world,300),
+  dailyTickForGM(world,300),
   worldPlanForGM(world).slice(0,250),
   ('【較遠的重要舊事：僅供GM核對，不是現場人物的共同記憶】\n'+durable).slice(0,650),
   chapters.slice(0,150),
@@ -272,6 +277,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  advanceLivingWorld(next,before,after);
  advanceNPCAgency(next,before,after);
  replanNPCAgendas(next,before,after);
+ settleWorldDays(next,before,after);
  maybeWriteChapter(next);
  return next;
 }
