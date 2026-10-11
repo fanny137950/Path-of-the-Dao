@@ -30,7 +30,7 @@ test('elapsed time advances exact requested delta across midnight and background
  assert.equal(world.minute,840);
  assert.ok(world.living.arcs[0].completed.includes('mismatch'));
  assert.ok(world.living.arcs[0].completed.includes('inquiry'));
- assert.equal(world.events.at(-1).advanceMinutes,360);
+ assert.equal(world.events.find(e=>e.type==='conversation').advanceMinutes,360);
  assert.equal(world.events.filter(e=>e.type==='conversation').length,1);
  world=commitV3Turn(world,'洛河繼續等待。','人群換過數次，夜裡安靜下來。','test-delta-2',{advanceMinutes:1440});
  assert.equal(elapsedMinutes(world),original+1800);
