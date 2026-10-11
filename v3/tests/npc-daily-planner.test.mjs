@@ -57,7 +57,7 @@ test('daily planning is idempotent and does not cancel an unfinished emergency',
  const world=initialV3World('daily-plan-priority');
  world.day=2;world.minute=530;
  world.npcAgency.agendas.han_su={id:'urgent',actorId:'han_su',cause:'NPC事件應變',
-  title:'緊急處置',start:1450,end:1700,location:'戒律峰'};
+  title:'緊急處置',start:1450,end:2100,location:'戒律峰'};
  let plans=advanceNPCDailyPlans(world,1430,1970);
  assert.equal(world.npcAgency.agendas.han_su.id,'urgent');
  assert.ok(plans.some(p=>p.actorId==='han_su'));
