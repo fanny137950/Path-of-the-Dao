@@ -12,6 +12,7 @@ import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory} from './du
 import {initialEventCalendar,ensureEventCalendar,addScheduledEvent,advanceEventCalendar,eventCalendarForGM} from './event-calendar.mjs';
 import {BUILTIN_EVENT_TEMPLATES,eventSourceCategory,GAME_YEAR_DAYS} from './event-templates.mjs';
 import {initialNPCAgency,ensureNPCAgency,advanceNPCAgency,npcAgencyForGM} from './npc-agency.mjs';
+import {registerNamedNPCs} from './npc-registration.mjs';
 /* Authoritative V3 character registry and per-character memories. No D1 schema changes. */
 export const V3_INTRO='太虛宗山門，晨光穿過石階旁的古松。今日正值收徒大典。\n\n十五歲的洛河來到山門時，韓守一正為新弟子核對名冊。附近有人測靈根，有人與同伴低聲交談。\n\n韓守一抬頭看了她一眼：「洛河？名冊上有你。想先問什麼，或直接開始測試，都可以。」\n\n山門裡仍有人來往，宗門的日常不會為誰停下。';
 export const MOODS=['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'];
@@ -45,7 +46,7 @@ export function initialV3World(id){
    family:clone(WORLD_BIBLE.protagonist.family),
    aptitude:{grade:'未知',description:'尚未完成靈根與資質測試；不能僅因往昔世界線直接認定。'},
    realm:'凡人',spiritualRoot:'未測定'},
-  npcs:clone(NPCS),npcAgency:null,eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION};
+  npcs:clone(NPCS),npcAgency:null,eventCalendar:initialEventCalendar(),memoryLedger:{version:1,entries:[]},events:[],messages:[{role:'assistant',content:V3_INTRO}],developerAudit:[],living:initialLivingWorld(),scene:initialScene(),bibleVersion:WORLD_BIBLE_VERSION,legacyNPCBackfillVersion:1};
  initial.npcAgency=initialNPCAgency(initial);
  return initial;
 }
@@ -78,6 +79,16 @@ export function validatedWorld(value){
   c.knowledge=Array.isArray(c.knowledge)?c.knowledge:[];
   c.privateNotes=Array.isArray(c.privateNotes)?c.privateNotes:[];
   c.relationships={player:{...relationship(),...c.relationships?.player}};
+ }
+ // One-time conservative migration for earlier saved games in which named
+ // speakers such as 葉沖 introduced themselves but were never written to D1.
+ // Do not reconstruct unverifiable private backgrounds or replay old events.
+ if(value.legacyNPCBackfillVersion!==1){
+  for(const m of value.messages.slice(-80)){
+   if(m.role==='assistant'&&!isNonNarrative(m.content))
+    registerNamedNPCs(value,visibleNarrative(m.content),[]);
+  }
+  value.legacyNPCBackfillVersion=1;
  }
  ensureNPCAgency(value);
  return value;
@@ -179,14 +190,15 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[]};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[]};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null,schedules=[];
+ let changes=[],move=null,schedules=[],newNPCs=[];
  try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
   if(parsed.move&&typeof parsed.move==='object')move=parsed.move;
-  if(Array.isArray(parsed.schedules))schedules=parsed.schedules.slice(0,2);}
+  if(Array.isArray(parsed.schedules))schedules=parsed.schedules.slice(0,2);
+  if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs};
 }
 function applyChanges(next,changes,text,narration,present){
  const evidenceText=text+'\n'+narration;
@@ -220,7 +232,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
   !/(尚未|未能|無法|不能|沒能|不准)/.test(move.evidence);
  next.revision++;
  const requestedMinutes=options.advanceMinutes;
- if(requestedMinutes!==undefined&&![15,60,360,1440].includes(requestedMinutes))throw Error('不支援的時間推進幅度');
+ if(requestedMinutes!==undefined&&![0,15,60,360,1440].includes(requestedMinutes))throw Error('不支援的時間推進幅度');
  const delta=requestedMinutes??(approvedMove?Math.max(30,timeCost(userText)):timeCost(userText));
  const after=before+delta;
  next.day=Math.floor(after/1440)+1;
@@ -231,11 +243,13 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  next.scene=updateScene(sceneOf(world),parsed.narration,next.location);
  if(root)next.scene.focus='測試結果';
  const eventId='turn:'+next.revision;
- const seenBy=privacyHint(userText)?[]:[...present];
+ const registration=registerNamedNPCs(next,parsed.narration,parsed.newNPCs);
+ const seenBy=privacyHint(userText)?[]:[...new Set([...present,...registration.mentioned])];
  next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration});
  next.events.push({requestId,id:eventId,revision:next.revision,day:next.day,minute:next.minute,
   type:'conversation',text:userText,reply:parsed.narration,location:world.location,
   ...(requestedMinutes?{advanceMinutes:requestedMinutes}:{}),
+  ...(options.sceneJump?{sceneJump:options.sceneJump}:{}),
   root:root||null,destination:approvedMove?move.to:null,witnesses:seenBy});
  for(const id of seenBy){
   const actor=next.npcs[id];
