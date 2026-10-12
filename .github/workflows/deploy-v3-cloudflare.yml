@@ -41,12 +41,23 @@ jobs:
           [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[a-fA-F0-9]{32}$ ]] || { echo 'Missing or invalid account secret'; exit 1; }
           API="https://api.cloudflare.com/client/v4"
           probe() {
-            local label="$1" path="$2" tmp code elapsed
+            local label="$1" path="$2" tmp code elapsed exitcode
             tmp=$(mktemp)
-            read -r code elapsed < <(curl --silent --show-error --max-time 25 \
+            # Keep diagnostic outputs secret-safe: print HTTP status and curl's
+            # numeric exit code only, never authorization headers or response bodies.
+            set +e
+            result=$(curl --silent --max-time 25 --connect-timeout 10 \
               -o "$tmp" -w '%{http_code} %{time_total}' \
               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              "$API$path") || { echo "$label: transport error or timeout"; rm -f "$tmp"; return 1; }
+              "$API$path" 2>/dev/null)
+            exitcode=$?
+            set -e
+            read -r code elapsed <<< "$result"
+            if [[ "$exitcode" -ne 0 ]]; then
+              echo "$label: curl exit=$exitcode, HTTP=${code:-000}, duration=${elapsed:-unknown}s"
+              rm -f "$tmp"
+              return 1
+            fi
             local success errors
             success=$(jq -r '.success // false' "$tmp" 2>/dev/null || echo 'non-json')
             errors=$(jq -rc '[.errors[]? | {code,message}]' "$tmp" 2>/dev/null || echo 'response-not-json')
@@ -54,6 +65,9 @@ jobs:
             rm -f "$tmp"
             [[ "$code" == 200 && "$success" == true ]]
           }
+          echo "Runner DNS (api.cloudflare.com):"
+          getent ahostsv4 api.cloudflare.com | head -n 2 | awk '{print $1}' || true
+          echo "Runner proxy configured: $([[ -n "${HTTPS_PROXY:-}${https_proxy:-}" ]] && echo yes || echo no)"
           failed=0
           probe 'Token verification' '/user/tokens/verify' || failed=1
           probe 'Worker settings' "/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WENDAO_WORKER_NAME/settings" || failed=1
