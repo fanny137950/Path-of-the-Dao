@@ -7,6 +7,14 @@ on:
         description: '輸入 wendao-living-world 才允許覆蓋現有 Worker'
         required: true
         type: string
+      mode:
+        description: 'diagnose = 僅檢查，不發布；deploy = 正式部署'
+        type: choice
+        required: true
+        default: diagnose
+        options:
+          - diagnose
+          - deploy
 
 permissions:
   contents: read
@@ -16,8 +24,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  diagnose:
+    if: ${{ inputs.confirmation == 'wendao-living-world' && inputs.mode == 'diagnose' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WENDAO_WORKER_NAME: wendao-living-world
+    steps:
+      - name: Diagnose Cloudflare API without deploying
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing token secret'; exit 1; }
+          [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[a-fA-F0-9]{32}$ ]] || { echo 'Missing or invalid account secret'; exit 1; }
+          API="https://api.cloudflare.com/client/v4"
+          probe() {
+            local label="$1" path="$2" tmp code elapsed
+            tmp=$(mktemp)
+            read -r code elapsed < <(curl --silent --show-error --max-time 25 \
+              -o "$tmp" -w '%{http_code} %{time_total}' \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "$API$path") || { echo "$label: transport error or timeout"; rm -f "$tmp"; return 1; }
+            local success errors
+            success=$(jq -r '.success // false' "$tmp" 2>/dev/null || echo 'non-json')
+            errors=$(jq -rc '[.errors[]? | {code,message}]' "$tmp" 2>/dev/null || echo 'response-not-json')
+            echo "$label: HTTP $code in ${elapsed}s, success=$success, errors=$errors"
+            rm -f "$tmp"
+            [[ "$code" == 200 && "$success" == true ]]
+          }
+          failed=0
+          probe 'Token verification' '/user/tokens/verify' || failed=1
+          probe 'Worker settings' "/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WENDAO_WORKER_NAME/settings" || failed=1
+          probe 'D1 list' "/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database?name=$WENDAO_WORKER_NAME" || failed=1
+          probe 'Worker subdomain' "/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" || failed=1
+          echo 'Diagnostic-only: no Worker upload, secret mutation, or database migration performed.'
+          exit "$failed"
+
   deploy:
-    if: ${{ inputs.confirmation == 'wendao-living-world' }}
+    if: ${{ inputs.confirmation == 'wendao-living-world' && inputs.mode == 'deploy' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
