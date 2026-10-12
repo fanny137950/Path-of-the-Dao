@@ -1,3 +1,4 @@
+import {roleplayContext} from './roleplay-context.mjs';
 import {isNonNarrative,requireNarrative,visibleNarrative} from './narrative.mjs';
 import {initialScene,sceneOf,updateScene,sceneContext} from './scene-context.mjs';
 import {initialLivingWorld,elapsedMinutes,timeCost,advanceLivingWorld,maybeWriteChapter,recallChapters,worldPlanForGM} from './living-world.mjs';
@@ -142,6 +143,7 @@ export function recalledMemories(actor,query,limit=8){
  })).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.m);
 }
 export function gmContext(world,userText,{includeDialogue=true}={}){
+ if(world.gmManaged)return roleplayContext(world,userText);
  const badEvents=new Set(world.events.filter(e=>isNonNarrative(e.reply)).map(e=>e.id));
  const present=nearbyCharacters(world);
  const people=present.map(actor=>{
@@ -204,10 +206,11 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,6500})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[],memories:[],offscreenChanges:[],elapsedMinutes:null};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[],memories:[],offscreenChanges:[],elapsedMinutes:null,protagonist:null};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[],memories=[],offscreenChanges=[],elapsedMinutes=null;
+ let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[],memories=[],offscreenChanges=[],elapsedMinutes=null,protagonist=null;
  try{const parsed=JSON.parse(match[1]);suggestions=validateSuggestions(parsed.suggestions,narration);
+  if(parsed.protagonist&&typeof parsed.protagonist==='object'&&!Array.isArray(parsed.protagonist))protagonist=parsed.protagonist;
   if(Array.isArray(parsed.memories))memories=parsed.memories.slice(0,6);
   if(Array.isArray(parsed.offscreenChanges))offscreenChanges=parsed.offscreenChanges.slice(0,6);
   if(Number.isInteger(parsed.elapsedMinutes)&&parsed.elapsedMinutes>=0&&parsed.elapsedMinutes<=129600)elapsedMinutes=parsed.elapsedMinutes;if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
@@ -216,14 +219,29 @@ export function parseGMResult(raw){
   if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);
   if(Array.isArray(parsed.taskUpdates))taskUpdates=parsed.taskUpdates.slice(0,5);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions,memories,offscreenChanges,elapsedMinutes};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions,memories,offscreenChanges,elapsedMinutes,protagonist};
+}
+function applyProtagonist(world,patch,narration){
+ if(!patch||typeof patch.evidence!=='string'||patch.evidence.length<4||patch.evidence.length>200||!narration.includes(patch.evidence))return;
+ const target=world.protagonist;
+ for(const field of ['realm','spiritualRoot','status','master','sect'])
+  if(typeof patch[field]==='string'&&patch[field].trim()&&patch[field].length<=100)target[field]=patch[field].trim();
+ if(Number.isSafeInteger(patch.spiritStones)&&patch.spiritStones>=0)target.spiritStones=patch.spiritStones;
+ for(const field of ['skills','equipment'])if(Array.isArray(patch[field])&&patch[field].length<=50&&patch[field].every(x=>typeof x==='string'&&x.trim()&&x.length<=80))target[field]=[...patch[field]];
+ if(Array.isArray(patch.inventory)&&patch.inventory.length<=80&&patch.inventory.every(x=>x&&typeof x.name==='string'&&x.name.trim()&&x.name.length<=80&&Number.isSafeInteger(x.quantity)&&x.quantity>=0))
+  target.inventory=patch.inventory.map(x=>({name:x.name.trim(),quantity:x.quantity}));
 }
 function applyChanges(next,changes,text,narration,present){
  const evidenceText=text+'\n'+narration;
  for(const change of changes){
-  if(!change||typeof change!=='object'||!present.has(change.id))continue;
-  const actor=next.npcs[change.id],quote=shorten(change.evidence,100);
+  if(!change||typeof change!=='object'||!Object.hasOwn(next.npcs,change.id)||(!next.gmManaged&&!present.has(change.id)))continue;
+  const actor=next.npcs[change.id],quote=shorten(change.evidence,next.gmManaged?200:100);
   if(!actor||quote.length<2||!evidenceText.includes(quote))continue;
+  if(next.gmManaged){
+   if(quote.length<4||!narration.includes(quote)||!quote.includes(actor.name))continue;
+   for(const field of ['status','goal','where','realm'])if(typeof change[field]==='string'&&change[field].trim()&&change[field].length<=180)actor[field]=change[field].trim();
+   if(Number.isInteger(change.cultivationProgress)&&change.cultivationProgress>=0&&change.cultivationProgress<=100)actor.cultivationProgress=change.cultivationProgress;
+  }
   if(MOODS.includes(change.mood))actor.mood=change.mood;
   // A generic emotional description cannot justify injury, recovery or
   // a complete new life goal. Require actor-specific evidence for both.
@@ -277,20 +295,21 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  const present=new Set(presentIds(world)),parsed=parseGMResult(rawAnswer),next=clone(world);
  const move=parsed.move;
  const approvedMove=move&&typeof move.to==='string'&&move.to.trim()&&move.to.length<=80&&(world.gmManaged||LOCATIONS.includes(move.to))&&move.to!==world.location&&
-  (userText.includes(move.to)||/(前往|走向|跟著|隨同|出發|帶我去)/.test(userText))&&
+  (world.gmManaged||userText.includes(move.to)||/(前往|走向|跟著|隨同|出發|帶我去)/.test(userText))&&
   typeof move.evidence==='string'&&move.evidence.length>=4&&move.evidence.length<=100&&
-  parsed.narration.includes(move.evidence)&&/(抵達|到達|來到|走進|進入)/.test(move.evidence)&&
+  parsed.narration.includes(move.evidence)&&(world.gmManaged||/(抵達|到達|來到|走進|進入)/.test(move.evidence))&&
   !/(尚未|未能|無法|不能|沒能|不准)/.test(move.evidence);
  next.revision++;
  const requestedMinutes=options.advanceMinutes;
  if(requestedMinutes!==undefined&&![0,15,60,360,1440].includes(requestedMinutes))throw Error('不支援的時間推進幅度');
- const delta=requestedMinutes??(world.gmManaged?parsed.elapsedMinutes:null)??(options.sceneJump?0:approvedMove?Math.max(30,timeCost(userText)):timeCost(userText));
+ const delta=requestedMinutes??(world.gmManaged?parsed.elapsedMinutes:null)??(world.gmManaged?0:options.sceneJump?0:approvedMove?Math.max(30,timeCost(userText)):timeCost(userText));
  const after=before+delta;
  next.day=Math.floor(after/1440)+1;
  next.minute=after%1440;
  if(approvedMove)next.location=move.to;
- const root=rootResultConfirmed(world,userText,parsed.narration);
+ const root=world.gmManaged?null:rootResultConfirmed(world,userText,parsed.narration);
  if(root)next.protagonist.spiritualRoot=root;
+ if(world.gmManaged)applyProtagonist(next,parsed.protagonist,parsed.narration);
  next.scene=updateScene(sceneOf(world),parsed.narration,next.location);
  if(root)next.scene.focus='測試結果';
  const eventId='turn:'+next.revision;

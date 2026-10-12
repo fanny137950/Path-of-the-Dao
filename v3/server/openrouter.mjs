@@ -12,7 +12,7 @@ export async function generateOpenRouterResponse({
    !(model==='openrouter/free'||/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+:free$/.test(model)))
   throw new AIProviderError('OpenRouter 只允許 openrouter/free 或 :free 模型',400);
  if(typeof instructions!=='string'||instructions.length>20000||
-   typeof input!=='string'||!input.trim()||input.length>12000)
+   typeof input!=='string'||!input.trim()||input.length>24000)
   throw new AIProviderError('無效 GM 輸入',400);
  if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>6000)
   throw new AIProviderError('輸出上限超出範圍',400);
