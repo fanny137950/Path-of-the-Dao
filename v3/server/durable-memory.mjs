@@ -75,3 +75,42 @@ export function recallDurableMemory(world,query,{actorId=null,limit=6,maxChars=1
    '【見證者】'+(m.witnesses?.map(id=>world.npcs?.[id]?.name||id).join('、')||'無')));
  return lines.join('\n').slice(0,maxChars);
 }
+
+/** GM notebook: source-backed public memories and explicitly scoped offscreen facts.
+ * No social simulator or predetermined NPC outcome runs here.
+ */
+export function recordGMMemories(world,records,offscreenChanges,narration){
+ world.gmMemories??=[];
+ const accepted=new Map();
+ for(const [index,item] of (Array.isArray(records)?records.slice(0,6):[]).entries()){
+  if(!item||typeof item.text!=='string'||!item.text.trim()||item.text.length>500||
+     typeof item.playerKnown!=='boolean'||!Array.isArray(item.knownBy)||item.knownBy.length>12||
+     item.knownBy.some(id=>typeof id!=='string'||!Object.hasOwn(world.npcs,id)))continue;
+  if(item.playerKnown&&(typeof item.evidence!=='string'||item.evidence.length<4||item.evidence.length>200||!narration.includes(item.evidence)))continue;
+  const memory={id:'gm-memory:'+world.revision+':'+index,revision:world.revision,
+   day:world.day,minute:world.minute,text:item.text.trim(),knownBy:[...new Set(item.knownBy)],
+   playerKnown:item.playerKnown,...(item.playerKnown?{evidence:item.evidence}:{})};
+  world.gmMemories.push(memory);accepted.set(index,memory);
+  for(const id of memory.knownBy){
+   const npc=world.npcs[id];
+   npc.knowledge.push(memory.id);
+   npc.memories.push({id:memory.id+':'+id,eventId:memory.id,kind:'知悉',day:world.day,minute:world.minute,
+    importance:2,source:'GM事件紀錄',text:memory.text});
+  }
+ }
+ for(const change of Array.isArray(offscreenChanges)?offscreenChanges.slice(0,6):[]){
+  if(!change||typeof change.id!=='string'||!Object.hasOwn(world.npcs,change.id))continue;
+  const memory=accepted.get(change.memoryIndex),npc=world.npcs[change.id];
+  if(!npc||!memory||memory.playerKnown||!memory.knownBy.includes(change.id))continue;
+  for(const field of ['goal','where'])if(typeof change[field]==='string'&&change[field].trim()&&change[field].length<=180)npc[field]=change[field].trim();
+  if(['平靜','愉快','好奇','警惕','不悅','憤怒','擔憂','疲憊','悲傷','緊張'].includes(change.mood))npc.mood=change.mood;
+  if(Number.isInteger(change.cultivationProgress)&&change.cultivationProgress>=0&&change.cultivationProgress<=100)npc.cultivationProgress=change.cultivationProgress;
+ }
+}
+export function gmNotebookContext(world,query){
+ const entries=world.gmMemories||[];
+ const ranked=entries.map((m,i)=>({m,score:overlap(query,m.text)*4+i/Math.max(1,entries.length)}))
+  .sort((a,b)=>b.score-a.score).slice(0,6).sort((a,b)=>a.m.revision-b.m.revision);
+ return '【GM事件記憶：知情範圍不可擴散】\n'+ranked.map(({m})=>
+  '第'+m.day+'日：'+m.text+'【'+(m.playerKnown?'洛河可知':'洛河未知')+'；知情者：'+m.knownBy.map(id=>world.npcs[id]?.name||id).join('、')+'】').join('\n').slice(0,1400);
+}

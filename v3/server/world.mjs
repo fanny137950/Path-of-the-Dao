@@ -5,10 +5,10 @@ import {pendingRootResult,rootResultConfirmed} from './action-rules.mjs';
 import {WORLD_BIBLE,CANON_LOCATIONS,WORLD_BIBLE_VERSION} from './world-bible.mjs';
 import {CHARACTER_BIBLE} from './character-bible.mjs';
 import {loreForGM,npcPortraitForGM} from './lore-retrieval.mjs';
-import {suggestedActions} from './action-suggestions.mjs';
+import {suggestedActions,validateSuggestions} from './action-suggestions.mjs';
 import {playerQuestJournal} from './player-journal.mjs';
 import {sceneConversationForGM,episodicMemoriesForGM} from './conversation-memory.mjs';
-import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory} from './durable-memory.mjs';
+import {hydrateDurableMemory,updateDurableMemory,recallDurableMemory,recordGMMemories,gmNotebookContext} from './durable-memory.mjs';
 import {initialEventCalendar,ensureEventCalendar,addScheduledEvent,advanceEventCalendar,eventCalendarForGM} from './event-calendar.mjs';
 import {BUILTIN_EVENT_TEMPLATES,eventSourceCategory,GAME_YEAR_DAYS} from './event-templates.mjs';
 import {initialNPCAgency,ensureNPCAgency,advanceNPCAgency,npcAgencyForGM} from './npc-agency.mjs';
@@ -110,6 +110,8 @@ export function playerWorld(world){
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
   location:world.location,bibleVersion:WORLD_BIBLE_VERSION,
+  gmManaged:world.gmManaged===true,
+  gmMemories:clone(world.gmMemories||[]),
   worldBible:clone(WORLD_BIBLE),protagonist:clone(world.protagonist),
   characters:clone(world.npcs),events:clone(world.events.slice(-25)),
   npcAgency:clone(ensureNPCAgency(world)),
@@ -139,7 +141,7 @@ export function recalledMemories(actor,query,limit=8){
   m,score:[...terms(m.text||'')].filter(k=>keys.has(k)).length*8+(m.importance||1)*2+i/Math.max(1,mem.length)
  })).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.m);
 }
-export function gmContext(world,userText){
+export function gmContext(world,userText,{includeDialogue=true}={}){
  const badEvents=new Set(world.events.filter(e=>isNonNarrative(e.reply)).map(e=>e.id));
  const present=nearbyCharacters(world);
  const people=present.map(actor=>{
@@ -162,29 +164,31 @@ export function gmContext(world,userText){
   world.protagonist.age+'歲，境界'+world.protagonist.realm+'，靈根'+world.protagonist.spiritualRoot+'。';
  const core=[
   scene.slice(0,500),
-  sceneContext(world,userText).slice(0,850),
+  ...(world.gmManaged?[]:[sceneContext(world,userText).slice(0,850)]),
   ('【現場人物】'+(present.map(x=>x.name).join('、')||'無已登記角色')+'。未在場的人不能突然知曉現場私事。').slice(0,220),
   // Keep the *contiguous* latest conversation as guaranteed context, not
   // optional tail content dropped by an oversized quest or NPC dossier.
-  sceneConversationForGM(world,userText,5700),
+  includeDialogue?sceneConversationForGM(world,userText,5700):'【最近對話另以原始 user/assistant 訊息提供；從最後一幕接續】',
   '【洛河最新輸入】'+userText,
   rootRule,
+  '【已記錄的當前任務進展：已發生的步驟不可重演】\n'+(world.eventCalendar?.events||[]).filter(e=>e.location===world.location).flatMap(e=>(e.progressLog||[]).slice(-3).map(p=>e.name+'：'+p.status+'；'+p.note)).join('\n').slice(-750),
   '【GM主動性】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
  ].filter(Boolean);
  const optional=[
+  gmNotebookContext(world,userText),
   people.slice(0,1500),
   loreForGM(world,userText,1050),
   episodicMemoriesForGM(world,userText,850),
-  eventCalendarForGM(world,650),
-  npcAgencyForGM(world,400),
-  dailyTickForGM(world,150),
-  worldPlanForGM(world).slice(0,200),
+  world.gmManaged?'【日程參考：不是必演流程，可概述等待或錯過】\n'+(world.eventCalendar?.events||[]).filter(e=>e.public&&e.state!=='cancelled'&&e.end>=elapsedMinutes(world)).slice(0,4).map(e=>e.name+'，地點'+e.location+'，第'+(Math.floor(e.start/1440)+1)+'日 '+Math.floor(e.start%1440/60)+':'+String(e.start%60).padStart(2,'0')+'開始').join('；'):eventCalendarForGM(world,650),
+  world.gmManaged?null:npcAgencyForGM(world,400),
+  world.gmManaged?null:dailyTickForGM(world,150),
+  world.gmManaged?null:worldPlanForGM(world).slice(0,200),
   ('【較遠的重要舊事（GM核對用，非所有NPC共有記憶）】\n'+durable).slice(0,500),
   chapters.slice(0,120)
  ].filter(Boolean);
  // Reserve the active dialogue and newest action before any optional records.
  // Optional records may shrink, never silently displace the user's latest turn.
- const limit=11800,coreText=core.join('\n\n');
+ const limit=includeDialogue?11800:9000,coreText=core.join('\n\n');
  let head=coreText;
  for(const item of optional){
   const left=limit-head.length-2;
@@ -195,20 +199,23 @@ export function gmContext(world,userText){
  return head.slice(0,limit);
 }
 
-const marker=/\n?<!--GM_STATE:([\s\S]{1,3000})-->\s*$/;
+const marker=/\n?<!--GM_STATE:([\s\S]{1,6500})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[]};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[],memories:[],offscreenChanges:[],elapsedMinutes:null};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[];
- try{const parsed=JSON.parse(match[1]);if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
+ let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[],memories=[],offscreenChanges=[],elapsedMinutes=null;
+ try{const parsed=JSON.parse(match[1]);suggestions=validateSuggestions(parsed.suggestions,narration);
+  if(Array.isArray(parsed.memories))memories=parsed.memories.slice(0,6);
+  if(Array.isArray(parsed.offscreenChanges))offscreenChanges=parsed.offscreenChanges.slice(0,6);
+  if(Number.isInteger(parsed.elapsedMinutes)&&parsed.elapsedMinutes>=0&&parsed.elapsedMinutes<=129600)elapsedMinutes=parsed.elapsedMinutes;if(Array.isArray(parsed.changes))changes=parsed.changes.slice(0,8);
   if(parsed.move&&typeof parsed.move==='object')move=parsed.move;
   if(Array.isArray(parsed.schedules))schedules=parsed.schedules.slice(0,2);
   if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);
   if(Array.isArray(parsed.taskUpdates))taskUpdates=parsed.taskUpdates.slice(0,5);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions,memories,offscreenChanges,elapsedMinutes};
 }
 function applyChanges(next,changes,text,narration,present){
  const evidenceText=text+'\n'+narration;
@@ -268,7 +275,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  const before=elapsedMinutes(world);
  const present=new Set(presentIds(world)),parsed=parseGMResult(rawAnswer),next=clone(world);
  const move=parsed.move;
- const approvedMove=move&&LOCATIONS.includes(move.to)&&move.to!==world.location&&
+ const approvedMove=move&&typeof move.to==='string'&&move.to.trim()&&move.to.length<=80&&(world.gmManaged||LOCATIONS.includes(move.to))&&move.to!==world.location&&
   (userText.includes(move.to)||/(前往|走向|跟著|隨同|出發|帶我去)/.test(userText))&&
   typeof move.evidence==='string'&&move.evidence.length>=4&&move.evidence.length<=100&&
   parsed.narration.includes(move.evidence)&&/(抵達|到達|來到|走進|進入)/.test(move.evidence)&&
@@ -276,7 +283,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  next.revision++;
  const requestedMinutes=options.advanceMinutes;
  if(requestedMinutes!==undefined&&![0,15,60,360,1440].includes(requestedMinutes))throw Error('不支援的時間推進幅度');
- const delta=requestedMinutes??(approvedMove?Math.max(30,timeCost(userText)):timeCost(userText));
+ const delta=requestedMinutes??(world.gmManaged?parsed.elapsedMinutes:null)??(options.sceneJump?0:approvedMove?Math.max(30,timeCost(userText)):timeCost(userText));
  const after=before+delta;
  next.day=Math.floor(after/1440)+1;
  next.minute=after%1440;
@@ -288,7 +295,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  const eventId='turn:'+next.revision;
  const registration=registerNamedNPCs(next,parsed.narration,parsed.newNPCs);
  const seenBy=privacyHint(userText)?[]:[...new Set([...present,...registration.mentioned])];
- next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration});
+ next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration,suggestions:parsed.suggestions});
  next.events.push({requestId,id:eventId,revision:next.revision,day:next.day,minute:next.minute,
   type:'conversation',text:userText,reply:parsed.narration,location:world.location,
   ...(requestedMinutes?{advanceMinutes:requestedMinutes}:{}),
@@ -299,7 +306,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
   actor.knowledge.push(eventId);
   actor.memories.push({id:eventId+':'+id,eventId,kind:'親歷',day:next.day,minute:next.minute,
    importance:/(答應|承諾|道歉|吵架|背叛|救|受傷|秘密)/.test(userText)?3:1,
-   source:'現場',text:shorten('洛河：'+userText+'；當時：'+parsed.narration,420)});
+   source:'現場',text:shorten((options.sceneJump||/^(?:系統|系统|GM|繼續|继续|就這樣|就这样)/i.test(userText)?'':'洛河：'+userText+'；')+'當時：'+parsed.narration,420)});
  }
  applyChanges(next,parsed.changes,userText,parsed.narration,present);
  applyTaskUpdates(next,parsed.taskUpdates,parsed.narration);
@@ -310,9 +317,13 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  }
  advanceEventCalendar(next,before,after);
  updateDurableMemory(next,next.events.find(e=>e.id===eventId));
- advanceLivingWorld(next,before,after);
- advanceNPCAgency(next,before,after);
- settleWorldDays(next,before,after);
+ if(world.gmManaged){
+  recordGMMemories(next,parsed.memories,parsed.offscreenChanges,parsed.narration);
+ }else{
+  advanceLivingWorld(next,before,after);
+  advanceNPCAgency(next,before,after);
+  settleWorldDays(next,before,after);
+ }
  maybeWriteChapter(next);
  return next;
 }

@@ -110,3 +110,22 @@ export function episodicMemoriesForGM(world,userText,maxChars=1350){
  return '【跨場景往事：GM參考，不表示在場NPC都知道】\n'+
    (lines.join('\n').slice(0,maxChars)||'無需引用的往事');
 }
+
+/** Send a contiguous suffix as actual conversation roles, not one giant user monologue. */
+export function providerConversation(world,text,maxChars=6500){
+ const messages=[];
+ let remaining=maxChars;
+ for(let i=world.messages.length-1;i>=0;i--){
+  const m=world.messages[i];
+  if(!['user','assistant'].includes(m.role)||typeof m.content!=='string')continue;
+  const content=m.role==='assistant'?visibleNarrative(m.content):m.content;
+  if(!content||isNonNarrative(content))continue;
+  if(content.length>remaining){
+   if(!messages.length)messages.unshift({role:m.role,content:'【最新回合尾段】'+content.slice(-remaining)});
+   break;
+  }
+  messages.unshift({role:m.role,content});remaining-=content.length;
+  if(messages.length>=16)break;
+ }
+ return [...messages,{role:'user',content:text}];
+}

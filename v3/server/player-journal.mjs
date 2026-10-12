@@ -6,6 +6,12 @@
 const short=(x,max=90)=>String(x||'').trim().slice(0,max);
 const seenText=world=>(world.messages||[]).filter(x=>x?.role==='assistant').map(x=>String(x.content||'')).join('\n');
 export function playerQuestJournal(world){
+ if(world.gmManaged){
+  // Observed facts, not a hard-coded main quest that steers the next turn.
+  const notes=(world.gmMemories||[]).filter(m=>m.playerKnown).slice(-12);
+  return notes.map(m=>({id:m.id,title:short(m.text,28),type:'經歷',status:'已記錄',
+   description:m.text,objective:'',progress:100,updatedDay:m.day}));
+ }
  const output=[];
  const story=seenText(world),events=(world.events||[]).filter(e=>e.type==='conversation');
  const root=world.protagonist?.spiritualRoot;

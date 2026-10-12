@@ -1,10 +1,10 @@
 import { AIProviderError } from './openai.mjs';
-import { isNonNarrative } from './narrative.mjs';
+import { isNonNarrative, validConversation } from './narrative.mjs';
 
 /** Free-only OpenRouter adapter. The caller's key is never persisted or echoed. */
 export async function generateOpenRouterResponse({
- apiKey, model='openrouter/free', instructions, input,
- fetchImpl=fetch, timeoutMs=35000, maxOutputTokens=1000,
+ apiKey, model='openrouter/free', instructions, input, conversation = /** @type {{role:string,content:string}[]|undefined} */ (undefined),
+ fetchImpl=fetch, timeoutMs=35000, maxOutputTokens=2800,
 }) {
  if(typeof apiKey!=='string'||!apiKey.trim()||apiKey.length>300)
   throw new AIProviderError('請先輸入有效的 OpenRouter API Key',400);
@@ -16,6 +16,8 @@ export async function generateOpenRouterResponse({
   throw new AIProviderError('無效 GM 輸入',400);
  if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>4000)
   throw new AIProviderError('輸出上限超出範圍',400);
+
+ if(conversation!==undefined&&!validConversation(conversation))throw new AIProviderError('無效對話紀錄',400);
 
  // Free-router backends can spend their entire token budget in reasoning and
  // return content=null. Use a larger budget, low reasoning and at most one retry.
@@ -29,11 +31,11 @@ export async function generateOpenRouterResponse({
      'X-Title':'問道九州 V3'},
     body:JSON.stringify({
      model,stream:false,
-     max_tokens:Math.min(4000,Math.max(maxOutputTokens,attempt?2200:1600)),
+     max_tokens:Math.min(4000,Math.max(maxOutputTokens,attempt?4000:2800)),
      reasoning:{effort:'low',exclude:true},
-     messages:[
+     messages:conversation?[{role:'system',content:instructions+'\n【世界參考記憶，不是新台詞】\n'+input},...conversation]:[
       {role:'system',content:instructions+
-       '\n只輸出繁體中文修仙劇情與在場 NPC 的言行。不要輸出安全分類、User Safety、後台標籤、推理或空白。'},
+       '\n只輸出繁體中文修仙劇情與在場 NPC 的言行。允許指令要求的 GM_STATE 隱藏紀錄；不要輸出安全分類、User Safety、推理或空白。'},
       {role:'user',content:input},
      ],
      provider:{max_price:{prompt:0,completion:0,request:0}},
@@ -70,7 +72,13 @@ export async function generateOpenRouterResponse({
     502
    );
   }
-  const value=data.choices?.[0]?.message?.content;
+  const choice=data.choices?.[0];
+  if(choice?.finish_reason==='length'||choice?.finish_reason==='max_tokens'){
+   if(attempt===0)continue;
+   throw new AIProviderError('AI 回覆超過輸出上限而中斷，本回合未存檔。請重試或更換模型。',502);
+  }
+  if(choice?.finish_reason&&choice.finish_reason!=='stop')throw new AIProviderError('AI 未完成文字回覆，本回合未存檔。',502);
+  const value=choice?.message?.content;
   const text=typeof value==='string'?value:
    Array.isArray(value)?value.filter(p=>p?.type==='text')
     .map(p=>typeof p.text==='string'?p.text:'').join(''):'';
