@@ -8,7 +8,7 @@ const page=readFileSync(new URL('../../app/v3/page.tsx',import.meta.url),'utf8')
 test('GM favors complete, living scenes over terse answers',()=>{
  assert.match(SCENE_PACING,/3～7 個有內容的自然段落/);
  assert.match(SCENE_PACING,/不代表只回一句/);
- assert.match(SCENE_PACING,/不必刻意灌水/);
+ assert.match(SCENE_PACING,/不用刻意灌水/);
  assert.ok(GM_INSTRUCTIONS.includes(SCENE_PACING));
 });
 test('selected provider and actual model are connected to player UI',()=>{
