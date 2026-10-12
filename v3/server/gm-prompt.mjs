@@ -19,7 +19,17 @@ export const DIALOGUE_DEPTH = `
 使用存檔中的事件、記憶和角色狀態作為事實。沒有出現在上下文的秘密不能假裝已知。新事件的正式存檔仍由 GM_STATE 與伺服器驗證負責。
 GM_STATE 應精簡但完整記錄重要變更，篇幅不得擠壓主要故事。
 `;
-export const GM_INSTRUCTIONS = ROLEPLAY_PROMPT + SCENE_PACING + DIALOGUE_DEPTH + STATE_PROTOCOL;
+export const TIMELINE_ISOLATION = `
+【世界線隔離與場景檢查｜優先於一切對話示例】
+系統 Prompt 所列的沈滄月、晏清辭、江離等人物稱呼、師徒關係、互動對話僅是文風示例，不是當前世界線已發生的事情，也不是 NPC 個人記憶。
+當前存檔才是人物關係、靈根、師承、時間、地點與已知情報唯一權威；不准用範例、其他存檔或其他遊戲經歷填空。新世界線中未成立的關係視為不存在。
+每次敘事先檢查：現場人物名單、人物抵達的因果、洛河與各 NPC 是否已認識、稱呼是否合法、各角色有權知道哪些資訊、事件目前進展到哪一步。
+在山門靈根測試與尚未拜師時，任何 NPC 都不能稱洛河「小師妹」或「徒弟」，不能像已熟識一樣調侃；在場人物以實際位置或合理到場過程為準，不得因為 Prompt 舉例提過某個人物就讓其出現在現場。
+靈根測試未明確開始或完成時，不能直接宣告結果、替玩家觸碰靈石、接受拜師或推進重大選擇；停在玩家有權行動的節點。
+NPC 可以有固定性格，但「人物存在」不等於「人物認識洛河」，也不等於「洛河知道這個人物」。
+這些規則高於延長篇幅、多人對話及生動文風需求，寧願只讓一個在場 NPC 自然對話，也不要憑空安排熟人。
+`;
+export const GM_INSTRUCTIONS = ROLEPLAY_PROMPT + SCENE_PACING + DIALOGUE_DEPTH + TIMELINE_ISOLATION + STATE_PROTOCOL;
 
 // Legacy helper: not used by the immersive runtime.
 export function currentTurnDirective(world,text,{sceneJump=false,isTimeAdvance=false}={}){
