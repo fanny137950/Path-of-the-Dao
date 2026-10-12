@@ -2,6 +2,8 @@
 import {providerConversation} from '../../../../v3/server/conversation-memory.mjs';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../../chatgpt-auth';
+// @ts-ignore - server-only JS config
+import {serverAIConfig,chooseServerAI} from '../../../../v3/server/server-ai.mjs';
 // @ts-ignore - module is authored in JS
 import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commitV3Turn,editCharacter,developerTaskChange} from '../../../../v3/server/world.mjs';
 // @ts-ignore - module is authored in JS
@@ -107,9 +109,9 @@ export async function POST(request:Request){
   if(world.events.filter((e:{type:string})=>e.type==='conversation').length>=1000)return reply({error:'試玩世界已達1000回合上限，請先備份'},409);
   const mode=body.mode;
   if(!['demo','ai','openrouter'].includes(mode))return reply({error:'未知對話模式'},400);
-  const key=typeof body.apiKey==='string'?body.apiKey:'';
-  if(key.length>300)return reply({error:'API Key 無效'},400);
-  const model=typeof body.model==='string'?body.model:undefined;
+  if(body.apiKey!==undefined)return reply({error:'本版使用伺服器金鑰，請勿傳送個人 API Key'},400);
+  const selected=mode==='demo'?null:chooseServerAI(serverAIConfig(env,user.userId),mode,body.model);
+  const model=selected?.model;
   world.gmManaged=true;
   const actingWorld=world;
   let answer:string,usage:null|{totalTokens?:number}=null;
@@ -121,7 +123,7 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective,conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false}),maxOutputTokens:4000};
+   const args={apiKey:selected!.apiKey,instructions:GM_INSTRUCTIONS+timeDirective,conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false}),maxOutputTokens:4000};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
