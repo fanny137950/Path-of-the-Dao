@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
-const revision = process.env.WENDAO_ART_REVISION || '095ce25c83e4b0b0b070f4088f76e0124e5ac05c';
+const revision = process.env.WENDAO_ART_REVISION || process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], {cwd:root, encoding:'utf8'}).trim();
 if (!/^[a-f0-9]{40}$/.test(revision)) throw Error('A full public artwork revision is required');
 const client = path.join(root, 'dist/client');
 const server = path.join(root, 'dist/server');
