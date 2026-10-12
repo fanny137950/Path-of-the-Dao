@@ -1,13 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {GM_INSTRUCTIONS,ROLEPLAY_PROMPT} from '../server/gm-prompt.mjs';
+import {GM_INSTRUCTIONS,ROLEPLAY_PROMPT,TIMELINE_ISOLATION} from '../server/gm-prompt.mjs';
 import {initialV3World,commitV3Turn,gmContext,validatedWorld,playerWorld} from '../server/world.mjs';
 const make=()=>({...initialV3World('immersive'),gmManaged:true});
 const raw=(narration,state)=>narration+'\n<!--GM_STATE:'+JSON.stringify(state)+'-->';
 
-test('runtime uses the supplied core prompt verbatim and no longer attaches procedural directors',()=>{
- assert.equal(ROLEPLAY_PROMPT,readFileSync(new URL('../../docs/GM-CORE-PROMPT.md',import.meta.url),'utf8'));
+test('runtime respects core world rules and isolates NPC knowledge from older relationship examples',()=>{
+ assert.match(ROLEPLAY_PROMPT,/NPC 的性格基準來源/);
+ assert.doesNotMatch(ROLEPLAY_PROMPT,/\*\*沈滄月｜師父\*\*/);
+ assert.match(TIMELINE_ISOLATION,/新世界線中未成立的關係視為不存在/);
+ assert.ok(GM_INSTRUCTIONS.includes(TIMELINE_ISOLATION));
  assert.ok(GM_INSTRUCTIONS.length<20000);
  const route=readFileSync(new URL('../../app/api/v3/world/route.ts',import.meta.url),'utf8');
  assert.doesNotMatch(route,/sceneJumpPlan|currentTurnDirective|checkWorldFacts|stabilizeDecisiveAction|assessActionResolution/);
