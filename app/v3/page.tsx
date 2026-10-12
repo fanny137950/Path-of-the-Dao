@@ -67,6 +67,7 @@ export default function V3(){
   if(!res.ok)throw Error(data.error||'讀取世界失敗');
   applyWorld(data);
   if(waiting&&data.confirmedRequestId===waiting.requestId){rememberPending(null);setText('');setError('');}
+  return data;
  }
  async function createWorld(){
   const response=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'new'})});
@@ -152,8 +153,32 @@ export default function V3(){
  async function checkPending(){
   if(!pendingRef.current||busy||loading)return;
   setLoading(true);setError('');
-  try{await loadWorld(pendingRef.current.world)}catch{setError('暫時無法確認存檔，請稍後再試。')}
+  try{
+   const waiting=pendingRef.current;
+   const latest=await loadWorld(waiting.world);
+   if(waiting&&latest.confirmedRequestId!==waiting.requestId){
+    setError('伺服器尚未保存上一回合。如果先前是模型白名單或權限錯誤，可點「取消待確認」修改模型再送出。');
+   }
+  }catch{setError('暫時無法確認存檔，請稍後再試。')}
   finally{setLoading(false)}
+ }
+ async function cancelPending(){
+  const waiting=pendingRef.current;
+  if(!waiting||busy||loading)return;
+  setLoading(true);
+  try{
+   const latest=await loadWorld(waiting.world);
+   if(latest.confirmedRequestId===waiting.requestId)return;
+   if(latest.revision!==waiting.revision){
+    rememberPending(null);setText('');
+    setError('存檔已更新，未完成的草稿已取消。請查看最新劇情後再繼續。');return;
+   }
+   if(!window.confirm('確定取消這筆待確認回合？若請求還在處理，可能稍後才寫入；不會刪除已保存的劇情。'))return;
+   rememberPending(null);
+   setText(waiting.op==='advance-time'?'':waiting.text);
+   setError('已解除輸入鎖定。請先到 AI 設定改用伺服器允許的模型，再重新送出。');
+  }catch{setError('無法確認伺服器存檔狀態，暫時保留回合以避免重複提交。')}
+  finally{setLoading(false);}
  }
  async function reset(){
   if(busy||loading||pending||!confirm('建立新的世界線？舊世界仍可從世界列表找回。'))return;
@@ -191,7 +216,10 @@ export default function V3(){
    if(!res.ok){
     // A revision conflict cannot commit this request: reload before proposing anew.
     if(res.status===409){await loadWorld(request.world);rememberPending(null);}
-    else if([400,401,413,422].includes(res.status))rememberPending(null);
+    else if([400,401,403,413,422,503].includes(res.status)){
+     rememberPending(null);
+     if([403,503].includes(res.status))setSettings(true);
+    }
     throw Error(data.error||'回合提交失敗');
    }
    applyWorld(data);rememberPending(null);setText('');
@@ -227,7 +255,7 @@ export default function V3(){
   <footer className="v3-compose">
    {away&&<button className="v3-jump" onClick={jumpLatest}><ArrowDown size={14}/>回到最新對話</button>}
    {error&&<div className="v3-error" role="alert"><span>{error}</span>{!pending&&<button aria-label="關閉提示" className="v3-icon" onClick={()=>setError('')}><X size={14}/></button>}</div>}
-   {pending&&!busy&&<div className="v3-retry-note"><span>上一回合尚待確認。重試不會重複推進世界。</span><div className="v3-retry-buttons"><button disabled={loading||testing} onClick={()=>void checkPending()}>確認存檔狀態</button><button disabled={loading||testing} onClick={()=>void send()}>重試上一回合</button></div></div>}
+   {pending&&!busy&&<div className="v3-retry-note"><span>上一回合尚待確認。重試不會重複推進世界。</span><div className="v3-retry-buttons"><button disabled={loading||testing} onClick={()=>void checkPending()}>確認存檔狀態</button><button disabled={loading||testing} onClick={()=>void send()}>重試上一回合</button><button disabled={loading||testing} onClick={()=>void cancelPending()}>取消待確認／修改模型</button></div></div>}
    {mode!=='demo'&&!loading&&!serverAI?.providers[mode]?.ready&&<div className="v3-connect-note"><span>伺服器尚未開啟這個 AI 模型服務。</span><button onClick={()=>setSettings(true)}>查看伺服器模型設定 <ChevronRight size={12}/></button></div>}
    <div className="v3-composer-box"><textarea ref={composer} aria-label="你的對話或行動" value={text} maxLength={2500} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&!window.matchMedia('(pointer: coarse)').matches){e.preventDefault();void send()}}} placeholder="說一句話，或做一件你想做的事…" disabled={busy||loading||!!pending} rows={2}/><div className="v3-composer-bottom"><span>{pending?'確認上一回合後，就能繼續接話':text.length>2000?`${text.length} / 2500`:'你的選擇，由你決定。'}</span><button className="v3-send" aria-label={busy?'等候回覆':'送出對話'} onClick={()=>void send()} disabled={busy||testing||loading||!!pending||!worldId||!text.trim()}>{busy?<LoaderCircle size={19}/>:<ArrowUp size={19}/>}</button></div></div>
    <div className="v3-composer-hint"><span>{busy?'等待回覆中':pending?'待確認':turn>0?'故事已保存':'自由對話 · 世界會記住你的行動'}</span><span className="v3-keyboard-hint">Enter 送出 · Shift + Enter 換行</span></div>
