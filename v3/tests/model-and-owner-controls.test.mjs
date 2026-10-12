@@ -12,15 +12,15 @@ test('GM favors complete, living scenes over terse answers',()=>{
  assert.ok(GM_INSTRUCTIONS.includes(SCENE_PACING));
 });
 test('selected provider and actual model are connected to player UI',()=>{
- assert.match(route,/model:model\|\|'openrouter\/free'/);
- assert.match(route,/model:model\|\|'gpt-4\.1-mini'/);
+ assert.match(route,/chooseServerAI\(serverAIConfig\(env,user\.userId\),mode,body\.model\)/);
  assert.match(route,/usedModel=result\.model/);
  assert.match(route,/usage,usedModel/);
  assert.match(connection,/body\.mode==='ai'/);
  assert.match(connection,/generateGMResponse\(args\)/);
  assert.match(connection,/generateOpenRouterResponse\(args\)/);
  assert.match(page,/上回合實際使用/);
- assert.match(page,/JSON\.stringify\(\{apiKey:apiKey\.trim\(\),model:model\.trim\(\),mode\}\)/);
+ assert.match(page,/JSON\.stringify\(\{model:model\.trim\(\),mode\}\)/);
+ assert.doesNotMatch(page,/setApiKey\(/);
 });
 test('own-world developer inspector and history deletion enforce account ownership',()=>{
  assert.match(route,/readWorld\(id,user\.userId\)/);
