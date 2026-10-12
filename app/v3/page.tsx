@@ -33,6 +33,7 @@ export default function V3(){
  const [developerTab,setDeveloperTab]=useState<'people'|'tasks'>('people');const journalDialog=useRef<HTMLDialogElement>(null);
  const [sidebar,setSidebar]=useState(false);const [away,setAway]=useState(false);const [visibleCount,setVisibleCount]=useState(60);
  const [reading,setReading]=useState<'normal'|'large'>('normal');
+ const [theme,setTheme]=useState<'light'|'dark'>('light');
  const [copied,setCopied]=useState<number|null>(null);const [elapsed,setElapsed]=useState(0);
  const timeline=useRef<HTMLDivElement>(null);const composer=useRef<HTMLTextAreaElement>(null);
  const settingsDialog=useRef<HTMLDialogElement>(null);const developerDialog=useRef<HTMLDialogElement>(null);
@@ -81,6 +82,7 @@ export default function V3(){
   (async()=>{try{
    try{
     if(localStorage.getItem('wendao-v3-reading')==='large')setReading('large');
+    if(localStorage.getItem('wendao-v3-theme')==='dark')setTheme('dark');
     const prefs=JSON.parse(localStorage.getItem(preferencesKey)||'null');
     if(prefs&&['demo','ai','openrouter'].includes(prefs.mode)&&typeof prefs.model==='string'){
      setMode(prefs.mode);setModel(prefs.model);
@@ -226,7 +228,7 @@ export default function V3(){
   }catch(e){setText(request.text);setError(e instanceof Error?e.message:'連線失敗，請重試同一回合')}
   finally{setBusy(false);inFlight.current=false;requestAnimationFrame(()=>composer.current?.focus())}
  }
- return <main className="v3-shell" data-reading={reading}>
+ return <main className="v3-shell" data-reading={reading} data-theme={theme}>
  <aside className={'v3-sidebar'+(sidebar?' is-open':'')} aria-label="世界導航">
   <div className="v3-brand"><span className="v3-seal">道</span><div><strong>問道九州</strong><small>一念入道 · 萬象隨心</small></div><button className="v3-mobile-close v3-icon" aria-label="關閉導航" onClick={()=>setSidebar(false)}><X size={18}/></button></div>
   <button className="v3-new-world" onClick={reset} disabled={busy||loading||!!pending}><Plus size={17}/>開啟新世界</button>
@@ -271,6 +273,7 @@ export default function V3(){
  <button className="v3-test-button" onClick={()=>void testConnection()} disabled={testing||busy||!serverAI?.providers[mode]?.ready}>{testing?'正在測試所選模型…':'測試目前模型'}</button>
  {connection&&<p className={'v3-connection-result'+(connection.startsWith('連線成功')?' is-success':'')} role="status">{connection}</p>}</>}
 
+ <fieldset className="v3-reading"><legend>畫面主題</legend><div>{(['light','dark'] as const).map(t=><button key={t} aria-pressed={theme===t} onClick={()=>{setTheme(t);localStorage.setItem('wendao-v3-theme',t)}}>{t==='light'?'☀ 明亮模式':'☾ 深色模式'}</button>)}</div></fieldset>
  <fieldset className="v3-reading"><legend>閱讀字級</legend><div>{(['normal','large'] as const).map(size=><button key={size} aria-pressed={reading===size} onClick={()=>{setReading(size);localStorage.setItem('wendao-v3-reading',size)}}>{size==='normal'?'標準':'放大'}</button>)}</div></fieldset>
  <details className="v3-advanced"><summary>進階與人物檔案</summary><p>已選模型：{model}{usedModel?' · 上回合實際使用：'+usedModel:''}{usage!==null?' · 上回合 '+usage+' tokens':''}</p><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('people');setDev(true)}}><BookOpen size={15}/>開發者人物檔案</button><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('tasks');setDev(true)}}><BookOpen size={15}/>開發者任務管理</button><p>只有已登入且擁有這個世界線的帳號可以查看或編輯這份後台資料。</p><button type="button" disabled={busy||loading||!!pending} className="v3-danger-button" onClick={()=>void clearHistory()}>永久清除我所有 V3 世界線及對話紀錄</button></details>
  <button className="v3-done-button" onClick={()=>setSettings(false)}>{mode==='demo'?'開始試玩':'回到故事'}<ChevronRight size={16}/></button>
