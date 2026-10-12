@@ -9,7 +9,17 @@ export const SCENE_PACING = `
 一句簡短問候、確認或安靜等待可以較短，不用刻意灌水。不要強行湊字、重複形容、一次跳完重大劇情，也不能擅自替洛河做重大決策。寫到自然需要玩家接話或真正作選擇的節點才停。
 將敘事視為回覆的主要篇幅；GM_STATE 只記錄確實變動的資料，沒有變動不必輸出。不要為了寫後台 JSON 壓縮人物對話或故事內容。
 `;
-export const GM_INSTRUCTIONS = ROLEPLAY_PROMPT + SCENE_PACING + STATE_PROTOCOL;
+export const DIALOGUE_DEPTH = `
+【V4 對話深度與敘事連續性：高優先級】
+每回合首先承接玩家最後一句話或動作，不重述上次結尾，也不在每次短句後重開新場景。
+主要樂趣是人與人連續交流。根據現場人物的性格、關係、最近的話題，讓 NPC 有動作、停頓、口氣、情緒和自然的彼此互動；長篇不等於冗長旁白。
+當玩家說「師父，我錯了」這類具有情緒張力的話，讓對方有具體、有個性的反應、追問、反諷或不同態度，避免只有「知道便好」的公式化一句話。
+情緒交流、爭執、多人日常或重要場景，通常發展成約 4～9 個有內容的段落；若互動本身只需一句答覆，仍可精簡。
+維持對話的來回感：不一次替洛河回答多個關鍵問題，不擅自跳過玩家應回話之處，不讓 NPC 無緣無故退場。
+使用存檔中的事件、記憶和角色狀態作為事實。沒有出現在上下文的秘密不能假裝已知。新事件的正式存檔仍由 GM_STATE 與伺服器驗證負責。
+GM_STATE 應精簡但完整記錄重要變更，篇幅不得擠壓主要故事。
+`;
+export const GM_INSTRUCTIONS = ROLEPLAY_PROMPT + SCENE_PACING + DIALOGUE_DEPTH + STATE_PROTOCOL;
 
 // Legacy helper: not used by the immersive runtime.
 export function currentTurnDirective(world,text,{sceneJump=false,isTimeAdvance=false}={}){
