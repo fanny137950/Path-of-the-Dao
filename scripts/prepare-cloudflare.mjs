@@ -9,7 +9,16 @@ export function standaloneConfig(base, { account, database, name = 'wendao-livin
   const { legacy_env: _deprecatedLegacyEnv, ...compatibleBase } = base;
   return {
     ...compatibleBase, name, topLevelName: name, ...(local ? {} : { account_id: account }), workers_dev: true,
-    vars: { AUTH_MODE: 'standalone', GAME_OWNER_ID: 'standalone-owner', GAME_DEVELOPER_USER_IDS: 'standalone-owner' },
+    // This is a single-owner private Worker. The authenticated owner must also
+    // be AI-allowlisted; omission previously disabled AI after each deployment.
+    vars: {
+      AUTH_MODE: 'standalone',
+      GAME_OWNER_ID: 'standalone-owner',
+      GAME_DEVELOPER_USER_IDS: 'standalone-owner',
+      V3_AI_USER_IDS: 'standalone-owner',
+      ...(process.env.V3_OPENAI_MODELS ? { V3_OPENAI_MODELS: process.env.V3_OPENAI_MODELS } : {}),
+      ...(process.env.V3_OPENROUTER_MODELS ? { V3_OPENROUTER_MODELS: process.env.V3_OPENROUTER_MODELS } : {}),
+    },
     d1_databases: [{ binding: 'DB', database_name: name, database_id: local ? placeholder : database, migrations_dir: '../../drizzle' }],
     services: [], r2_buckets: [],
   };
