@@ -8,12 +8,8 @@ import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commi
 import {generateGMResponse} from '../../../../v3/server/openai.mjs';
 // @ts-ignore - module is authored in JS
 import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
-// @ts-ignore - backend scene jump planner
-import {sceneJumpPlan,prepareSceneJump} from '../../../../v3/server/scene-jump.mjs';
-// @ts-ignore - backend narration fact guard
-import {checkWorldFacts,correctionDirective} from '../../../../v3/server/world-fact-guard.mjs';
 // @ts-ignore - pure GM prompt contract
-import {GM_INSTRUCTIONS,currentTurnDirective} from '../../../../v3/server/gm-prompt.mjs';
+import {GM_INSTRUCTIONS} from '../../../../v3/server/gm-prompt.mjs';
 
 // @ts-ignore - request identity and optimistic concurrency only
 import {turnIdentity,checkTurnRequest} from '../../../../v3/server/turn-request.mjs';
@@ -115,9 +111,7 @@ export async function POST(request:Request){
   if(key.length>300)return reply({error:'API Key 無效'},400);
   const model=typeof body.model==='string'?body.model:undefined;
   world.gmManaged=true;
-  const scenePlan=!isTimeAdvance?sceneJumpPlan(world,text):null;
-  if(scenePlan?.blocked)return reply({error:scenePlan.reason||'無法跳轉到指定活動'},400);
-  const actingWorld=scenePlan?prepareSceneJump(world,scenePlan):world;
+  const actingWorld=world;
   let answer:string,usage:null|{totalTokens?:number}=null;
   if(mode==='demo')answer=isTimeAdvance
    ?'洛河在原處等待，時間緩緩流逝。來往弟子換了幾批，周遭的宗務照常運作。\n\n（示範模式不會產生動態 NPC 對話，請使用 AI 模式體驗故事。）'
@@ -126,23 +120,16 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective+(scenePlan?'\n\n'+scenePlan.directive:''),conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false})+'\n\n'+currentTurnDirective(actingWorld,text,{sceneJump:!!scenePlan,isTimeAdvance}),maxOutputTokens:4000};
+   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective,conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false}),maxOutputTokens:4000};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
    const result=await generate(args.instructions);
    answer=result.text;usage=result.usage;
-   const facts=checkWorldFacts(actingWorld,answer);
-   if(!facts.ok){
-    const retry=await generate(args.instructions+correctionDirective(facts));
-    answer=retry.text;
-    usage={totalTokens:(result.usage?.totalTokens||0)+(retry.usage?.totalTokens||0)};
-    if(!checkWorldFacts(actingWorld,answer).ok)return reply({error:'GM 回覆與既定人物資料矛盾，本回合未存檔，請重試。'},502);
-   }
   }
 
   const next=commitV3Turn(actingWorld,text,answer,body.requestId,
-   isTimeAdvance?{advanceMinutes:requestedMinutes}:scenePlan?{sceneJump:{eventId:scenePlan.eventId,minutes:scenePlan.minutes}}:{});
+   isTimeAdvance?{advanceMinutes:requestedMinutes}:{});
   const committed=next.events.find((event:{requestId?:string})=>event.requestId===body.requestId);
   committed.request=identity;
   // Compare-and-swap: no partial turn or lost concurrent update.

@@ -19,7 +19,7 @@ type DeveloperData={
  characters:Record<string,Character>;bibleVersion?:number;
  gmMemories?:{id:string;day:number;text:string;playerKnown:boolean;knownBy:string[]}[];
  npcAgency?:{lastAdvancedAt:number;agendas:Record<string,NPCAgenda>;history:{id:string;actorId:string;at:number;title:string;location:string}[]};
- protagonist?:{name:string;age:number;gender?:string;hometown?:string;realm:string;spiritualRoot:string;aptitude?:{grade:string;description:string};family?:string[]};
+ protagonist?:{master?:string;status?:string;spiritStones?:number;inventory?:{name:string;quantity:number}[];name:string;age:number;gender?:string;hometown?:string;realm:string;spiritualRoot:string;aptitude?:{grade:string;description:string};family?:string[]};
  worldBible?:{title:string;sect?:{recruitment:{steps:string[]};peaks:{name:string;domain:string;leader:string;source:string}[]};
   cultivation?:{realmOrder:string[];hardRules:string[]};factions?:{name:string;region:string;stance:string}[]};
  events:{id?:string;text:string;reply:string;witnesses?:string[]}[];
@@ -110,6 +110,10 @@ export default function V3DeveloperPanel({
     <summary>洛河 · 玩家主角資料（自由角色扮演）</summary>
     <p>{data.protagonist.name}，{data.protagonist.gender||'女'}，{data.protagonist.age}歲，來自{data.protagonist.hometown||'青石鎮'}</p>
     <p><strong>目前境界：</strong>{data.protagonist.realm}；<strong>靈根：</strong>{data.protagonist.spiritualRoot}；<strong>資質：</strong>{data.protagonist.aptitude?.grade||'未知'}</p>
+    {data.protagonist.master&&<p><strong>師承：</strong>{data.protagonist.master}</p>}
+    {data.protagonist.status&&<p><strong>身體狀態：</strong>{data.protagonist.status}</p>}
+    {data.protagonist.spiritStones!==undefined&&<p><strong>靈石：</strong>{data.protagonist.spiritStones}</p>}
+    {data.protagonist.inventory&&<p><strong>隨身物品：</strong>{data.protagonist.inventory.map(x=>x.name+' × '+x.quantity).join('、')||'無'}</p>}
     <p><strong>家人：</strong>{data.protagonist.family?.join('；')}</p>
     <p>洛河的思想、性格發展與重大決定由玩家控制，原型設定不限制玩家自由演出。</p>
    </details>}

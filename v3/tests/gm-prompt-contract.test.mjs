@@ -5,9 +5,9 @@ import {gmContext,initialV3World,commitV3Turn,validatedWorld} from '../server/wo
 
 test('GM contract prioritizes current executed action, while dialogue remains dialogue',()=>{
  const w=initialV3World('gm-contract-action');
- assert.match(GM_INSTRUCTIONS,/立即嘗試的行動/);
- assert.match(GM_INSTRUCTIONS,/當回合/);
- assert.match(GM_INSTRUCTIONS,/最近場景原話優先/);
+ assert.match(GM_INSTRUCTIONS,/判定玩家行動的合理結果/);
+ assert.match(GM_INSTRUCTIONS,/每回合/);
+ assert.match(GM_INSTRUCTIONS,/對話必須自然、連續、有生活感/);
  assert.match(currentTurnDirective(w,'打他'),/已指定立即執行的動作/);
  assert.match(currentTurnDirective(w,'拿起茶杯砸過去'),/已指定立即執行的動作/);
  assert.match(currentTurnDirective(w,'你很欠打'),/自然對話/);
@@ -46,7 +46,7 @@ test('closing a conversation is contextual pacing, not automatically player spee
  assert.match(currentTurnDirective(w,'就這樣'),/結束這段交流/);
  assert.match(currentTurnDirective(w,'我說：「就這樣。」'),/自然對話/);
  assert.match(GM_INSTRUCTIONS,/suggestions/);
- assert.match(GM_INSTRUCTIONS,/不要僅增加氣氛/);
+ assert.match(GM_INSTRUCTIONS,/不要過度中斷/);
 });
 
 test('completed assessment notes remain in GM context after long dialogue',()=>{

@@ -4,13 +4,13 @@ import {GM_INSTRUCTIONS} from '../server/gm-prompt.mjs';
 import {initialV3World,commitV3Turn,parseGMResult,developerWorld,playerWorld,validatedWorld} from '../server/world.mjs';
 
 test('GM follows original roleplay contract, records instead of driving plot',()=>{
- assert.match(GM_INSTRUCTIONS,/玩家控制洛河的重要行動/);
- assert.match(GM_INSTRUCTIONS,/只是世界中的一個人/);
- assert.match(GM_INSTRUCTIONS,/檢定通常隱藏/);
- assert.match(GM_INSTRUCTIONS,/最近場景原話優先/);
- assert.match(GM_INSTRUCTIONS,/當回合/);
+ assert.match(GM_INSTRUCTIONS,/玩家擁有洛河的最終決策權/);
+ assert.match(GM_INSTRUCTIONS,/玩家不是所有事件的中心/);
+ assert.match(GM_INSTRUCTIONS,/不公開不必要的檢定/);
+ assert.match(GM_INSTRUCTIONS,/對話必須自然、連續、有生活感/);
+ assert.match(GM_INSTRUCTIONS,/每回合/);
  assert.match(GM_INSTRUCTIONS,/taskUpdates/);
- assert.match(GM_INSTRUCTIONS,/沒有變動的欄位就省略/);
+ assert.match(GM_INSTRUCTIONS,/沒有變動的欄位省略/);
 });
 test('narrated NPC changes and task progress are saved independently',()=>{
  const world=initialV3World('simple-gm-record');
