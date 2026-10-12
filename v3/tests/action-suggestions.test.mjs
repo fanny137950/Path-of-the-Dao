@@ -16,22 +16,23 @@ test('only GM-authored actions survive commit, save reload and player projection
  assert.equal(w.events.length,1);
 });
 
-test('empty, omitted or malformed next-turn metadata clears old suggestions',()=>{
+test('missing AI suggestions yield safe generic options instead of stale choices',()=>{
  const w=commitV3Turn(initialV3World('clear-actions'),'我要測試',reply([action]),'a');
  for(const raw of [reply([]),narration,narration+'<!--GM_STATE:{broken-->',narration+'<!--GM_STATE:null-->']){
   const next=commitV3Turn(w,'繼續',raw,'b');
-  assert.deepEqual(suggestedActions(next),[]);
+  assert.equal(suggestedActions(next).length,3);
+  assert.ok(suggestedActions(next).every(x=>x.kind==='action'&&!x.text.includes('測靈石')));
  }
- assert.deepEqual(suggestedActions(initialV3World('legacy-actions')),[]);
+ assert.equal(suggestedActions(initialV3World('legacy-actions')).length,3);
 });
 
 test('reject invalid, duplicate, ungrounded and excessive suggestions',()=>{
  const more=[1,2,3,4].map(n=>({...action,label:'選項'+n,text:'我詢問測試細節'+n}));
  const items=[null,{}, {...action,evidence:'只有後台知道的秘密'}, {...action,label:'x'.repeat(33)}, {...action,text:'<script>'},action,action,...more];
  const parsed=parseGMResult(reply(items));
- assert.equal(parsed.suggestions.length,3);
+ assert.equal(parsed.suggestions.length,4);
  assert.equal(parsed.suggestions[0].text,action.text);
- assert.equal(new Set(parsed.suggestions.map(x=>x.text)).size,3);
+ assert.equal(new Set(parsed.suggestions.map(x=>x.text)).size,4);
 });
 
 test('private state and recruitment keywords never manufacture shortcuts',()=>{
@@ -39,7 +40,7 @@ test('private state and recruitment keywords never manufacture shortcuts',()=>{
  w.messages.push({role:'assistant',content:'接引代表等待展示，各峰在核對名冊。'});
  w.npcs.registrar.privateNotes.push('隱藏入門手續');
  w.eventCalendar.events.find(e=>e.id==='twelve-peaks-selection').state='active';
- assert.deepEqual(suggestedActions(w),[]);
+ assert.equal(suggestedActions(w).length,3);
  const before=JSON.stringify(w);
  playerWorld(w);
  assert.equal(JSON.stringify(w),before);
