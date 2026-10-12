@@ -93,8 +93,8 @@ export default function V3(){
    if(configResponse.ok){
     const config=await configResponse.json() as ServerAI;setServerAI(config);
     const prefs=JSON.parse(localStorage.getItem(preferencesKey)||'null');
-    const preferredMode:Mode=prefs&&['ai','openrouter'].includes(prefs.mode)?prefs.mode:'ai';
-    const nextMode:Mode=config.providers[preferredMode].ready?preferredMode:config.providers.ai.ready?'ai':config.providers.openrouter.ready?'openrouter':preferredMode;
+    const preferredMode:'ai'|'openrouter'=prefs?.mode==='openrouter'?'openrouter':'ai';
+    const nextMode:'ai'|'openrouter'=config.providers[preferredMode].ready?preferredMode:config.providers.ai.ready?'ai':config.providers.openrouter.ready?'openrouter':preferredMode;
     const allowedModels=config.providers[nextMode].models;
     const nextModel=allowedModels.includes(prefs?.model)?prefs.model:allowedModels[0]||'gpt-4.1-mini';
     setMode(nextMode);setModel(nextModel);
