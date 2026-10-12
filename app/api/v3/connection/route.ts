@@ -16,7 +16,7 @@ export async function POST(request:Request){
   try{body=JSON.parse(raw);}catch{return reply({error:'無效設定'},400);}
   if(body.mode!=='ai'&&body.mode!=='openrouter')return reply({error:'未知 AI 模式'},400);
   const args={
-   apiKey:body.apiKey,model:body.model||(body.mode==='ai'?'gpt-4.1-mini':'openrouter/free'),maxOutputTokens:160,
+   apiKey:body.apiKey,model:body.model||(body.mode==='ai'?'gpt-4.1-mini':'openrouter/free'),maxOutputTokens:600,
    instructions:'以繁體中文回覆一句修仙人物的簡短問候，不加標記。',
    input:'請讓守門弟子說一句歡迎來到太虛宗。這是連線測試，不建立世界紀錄。',
   };
