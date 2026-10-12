@@ -1,31 +1,36 @@
+import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../../chatgpt-auth';
-// @ts-ignore — server-only JS adapter
+// @ts-ignore - JS adapters
 import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
-// @ts-ignore - server-only JS adapter
+// @ts-ignore - JS adapters
 import {generateGMResponse} from '../../../../v3/server/openai.mjs';
+// @ts-ignore - server-only JS config
+import {serverAIConfig,publicAIConfig,chooseServerAI} from '../../../../v3/server/server-ai.mjs';
 export const dynamic='force-dynamic';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
+export async function GET(){
+ const user=await getChatGPTUser();
+ if(!user)return reply({error:'請先登入'},401);
+ return reply(publicAIConfig(serverAIConfig(env,user.userId)));
+}
 export async function POST(request:Request){
  try{
   const origin=request.headers.get('origin');
   if(origin&&origin!==new URL(request.url).origin)return reply({error:'拒絕跨來源請求'},403);
-  if(!await getChatGPTUser())return reply({error:'請先登入'},401);
-  const raw=await request.text();
-  if(raw.length>1500)return reply({error:'請求過長'},413);
+  const user=await getChatGPTUser();if(!user)return reply({error:'請先登入'},401);
+  const raw=await request.text();if(raw.length>1000)return reply({error:'請求過長'},413);
   let body;
   try{body=JSON.parse(raw);}catch{return reply({error:'無效設定'},400);}
+  if(body.apiKey!==undefined)return reply({error:'本版 API 金鑰由伺服器管理，不可由網頁傳送'},400);
   if(body.mode!=='ai'&&body.mode!=='openrouter')return reply({error:'未知 AI 模式'},400);
-  const args={
-   apiKey:body.apiKey,model:body.model||(body.mode==='ai'?'gpt-4.1-mini':'openrouter/free'),maxOutputTokens:600,
+  const chosen=chooseServerAI(serverAIConfig(env,user.userId),body.mode,body.model);
+  const args={...chosen,maxOutputTokens:600,
    instructions:'以繁體中文回覆一句修仙人物的簡短問候，不加標記。',
-   input:'請讓守門弟子說一句歡迎來到太虛宗。這是連線測試，不建立世界紀錄。',
-  };
-  const result=body.mode==='ai'
-   ?await generateGMResponse(args)
-   :await generateOpenRouterResponse(args);
+   input:'請讓守門弟子說一句歡迎來到太虛宗。這是連線測試，不建立世界紀錄。'};
+  const result=body.mode==='ai'?await generateGMResponse(args):await generateOpenRouterResponse(args);
   return reply({ok:true,model:result.model,sample:result.text,usage:result.usage});
  }catch(e){
-  const error=e as {status?:number;message?:string};
-  return reply({error:error.status?error.message:'連線測試失敗，請稍後再試'},error.status||502);
+  const err=e as {status?:number;message?:string};
+  return reply({error:err.status?err.message:'連線測試失敗，請稍後再試'},err.status||502);
  }
 }
