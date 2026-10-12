@@ -6,8 +6,9 @@ export function standaloneConfig(base, { account, database, name = 'wendao-livin
   const placeholder = '00000000-0000-4000-8000-000000000000';
   if (!local && (!/^[a-f0-9]{32}$/i.test(account || '') || !/^[a-f0-9-]{36}$/i.test(database || '') || database === placeholder)) throw Error('A real Cloudflare account ID and D1 database ID are required');
   if (!base.main || !base.assets?.directory) throw Error('Build output is missing; build the project first');
+  const { legacy_env: _deprecatedLegacyEnv, ...compatibleBase } = base;
   return {
-    ...base, name, topLevelName: name, ...(local ? {} : { account_id: account }), workers_dev: true,
+    ...compatibleBase, name, topLevelName: name, ...(local ? {} : { account_id: account }), workers_dev: true,
     vars: { AUTH_MODE: 'standalone', GAME_OWNER_ID: 'standalone-owner', GAME_DEVELOPER_USER_IDS: 'standalone-owner' },
     d1_databases: [{ binding: 'DB', database_name: name, database_id: local ? placeholder : database, migrations_dir: '../../drizzle' }],
     services: [], r2_buckets: [],
