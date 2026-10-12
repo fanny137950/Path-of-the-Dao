@@ -11,7 +11,7 @@ type Suggestion={label:string;text:string;kind?:'action'|'advance'};
 type Quest={id:string;title:string;type:string;status:string;description:string;objective:string;progress:number;updatedDay:number};
 type WorldView={journal?:Quest[];confirmedRequestId?:string|null;suggestions?:Suggestion[];id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;usedModel?:string;error?:string};
 type WorldEntry={id:string;name:string;revision:number;created:string};
-type ServerAI={allowed:boolean;providers:{ai:{ready:boolean;models:string[]};openrouter:{ready:boolean;models:string[]}}};
+type ServerAI={userId?:string;allowed:boolean;providers:{ai:{ready:boolean;models:string[]};openrouter:{ready:boolean;models:string[]}}};
 type Pending={op?:'turn'|'advance-time';advanceMinutes?:number;world:string;revision:number;requestId:string;text:string;mode:Mode;model:string};
 const worldKey='wendao-v3-chat-first-world';
 const pendingKey='wendao-v3-pending-turn';
@@ -93,10 +93,11 @@ export default function V3(){
    if(configResponse.ok){
     const config=await configResponse.json() as ServerAI;setServerAI(config);
     const prefs=JSON.parse(localStorage.getItem(preferencesKey)||'null');
-    if(!prefs?.mode){
-     const nextMode:Mode=config.providers.ai.ready?'ai':config.providers.openrouter.ready?'openrouter':'ai';
-     setMode(nextMode);setModel(config.providers[nextMode]?.models?.[0]||'gpt-4.1-mini');
-    }
+    const preferredMode:Mode=prefs&&['ai','openrouter'].includes(prefs.mode)?prefs.mode:'ai';
+    const nextMode:Mode=config.providers[preferredMode].ready?preferredMode:config.providers.ai.ready?'ai':config.providers.openrouter.ready?'openrouter':preferredMode;
+    const allowedModels=config.providers[nextMode].models;
+    const nextModel=allowedModels.includes(prefs?.model)?prefs.model:allowedModels[0]||'gpt-4.1-mini';
+    setMode(nextMode);setModel(nextModel);
    }
    const entries=await listWorlds();
    const id=pendingRef.current?.world||localStorage.getItem(worldKey);
@@ -128,7 +129,7 @@ export default function V3(){
  function showOlder(){if(timeline.current)olderScroll.current={height:timeline.current.scrollHeight,top:timeline.current.scrollTop};setVisibleCount(n=>n+60);}
 
  function selectMode(next:Mode){
-  const nextModel=next==='ai'?'gpt-4.1-mini':'openrouter/free';
+  const nextModel=next==='ai'?(serverAI?.providers.ai.models[0]||'gpt-4.1-mini'):(serverAI?.providers.openrouter.models[0]||'openrouter/free');
   setMode(next);setModel(nextModel);setConnection('');setUsedModel('');
   localStorage.setItem(preferencesKey,JSON.stringify({mode:next,model:nextModel}));
  }
@@ -237,7 +238,7 @@ export default function V3(){
  {mode!=='demo'&&<label className="v3-field">模型 ID<select value={model} onChange={e=>{setModel(e.target.value);setConnection('');localStorage.setItem(preferencesKey,JSON.stringify({mode,model:e.target.value}))}}>{[...new Set([model,...(serverAI?.providers[mode]?.models||[])])].map(id=><option key={id} value={id}>{id}</option>)}</select></label>}</fieldset>
 
  {mode!=='demo'&&<><p className="v3-setting-help">API Key 由 Cloudflare 伺服器保管，無需在此輸入。你可以在下方測試允許的模型；不會從瀏覽器傳送金鑰。</p>
- <p className="v3-setting-help">帳號授權：{serverAI?.allowed?'已授權':'尚未授權'} · {mode==='ai'?'OpenAI':'OpenRouter'}：{serverAI?.providers[mode]?.ready?'伺服器已連線':'未設定'}。</p>
+ <p className="v3-setting-help">帳號授權：{serverAI?.allowed?'已授權':'尚未授權'} · 登入使用者 ID：{serverAI?.userId||'讀取中'} · {mode==='ai'?'OpenAI':'OpenRouter'}：{serverAI?.providers[mode]?.ready?'伺服器已連線':'未設定'}。</p>
  <p className="v3-setting-help">伺服器允許的模型：{serverAI?.providers[mode]?.models.join('、')||'尚未讀取'}</p>
  <button className="v3-test-button" onClick={()=>void testConnection()} disabled={testing||busy||!serverAI?.providers[mode]?.ready}>{testing?'正在測試所選模型…':'測試目前模型'}</button>
  {connection&&<p className={'v3-connection-result'+(connection.startsWith('連線成功')?' is-success':'')} role="status">{connection}</p>}</>}
