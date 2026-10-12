@@ -15,8 +15,9 @@ type Character={
 };
 type NPCAgenda={id:string;actorId:string;title:string;location:string;start:number;end:number;phase:string;goal:string;status:string;cause:string;summary?:string};
 type DeveloperData={
- revision:number;world:string;day:number;minute:number;location:string;
+ gmManaged?:boolean;revision:number;world:string;day:number;minute:number;location:string;
  characters:Record<string,Character>;bibleVersion?:number;
+ gmMemories?:{id:string;day:number;text:string;playerKnown:boolean;knownBy:string[]}[];
  npcAgency?:{lastAdvancedAt:number;agendas:Record<string,NPCAgenda>;history:{id:string;actorId:string;at:number;title:string;location:string}[]};
  protagonist?:{name:string;age:number;gender?:string;hometown?:string;realm:string;spiritualRoot:string;aptitude?:{grade:string;description:string};family?:string[]};
  worldBible?:{title:string;sect?:{recruitment:{steps:string[]};peaks:{name:string;domain:string;leader:string;source:string}[]};
@@ -98,6 +99,13 @@ export default function V3DeveloperPanel({
   {loading&&<p>正在從 D1 讀取世界資料……</p>}
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {notice&&<p className="v3-success">{notice}</p>}
+  {!!data?.gmMemories?.length&&<details className="v3-dev-dossier">
+   <summary>GM 事件記憶與知情範圍（{data.gmMemories.length} 筆）</summary>
+   {data.gmMemories.slice(-30).reverse().map(memory=><p key={memory.id} className="v3-memory-item">
+    第{memory.day}日 · {memory.playerKnown?'洛河可知':'幕後記憶'}：{memory.text}<br/>
+    知情人物：{memory.knownBy.map(id=>data.characters[id]?.name||id).join('、')||'無'}
+   </p>)}
+  </details>}
   {data?.protagonist&&<details className="v3-dev-dossier" open>
     <summary>洛河 · 玩家主角資料（自由角色扮演）</summary>
     <p>{data.protagonist.name}，{data.protagonist.gender||'女'}，{data.protagonist.age}歲，來自{data.protagonist.hometown||'青石鎮'}</p>
@@ -150,7 +158,7 @@ export default function V3DeveloperPanel({
    <div className="v3-dev-details">
     {!actor||!draft?<p>請選擇人物。</p>:<>
      <h4>{actor.name} <span className="v3-dev-muted">#{actor.id}</span></h4>
-     {data.npcAgency?.agendas[actor.id]&&<div className="v3-dev-dossier" style={{padding:'12px 16px',marginBottom:16}}>
+     {!data.gmManaged&&data.npcAgency?.agendas[actor.id]&&<div className="v3-dev-dossier" style={{padding:'12px 16px',marginBottom:16}}>
       <strong>NPC 自主行動 · 當前日程</strong>
       <p><strong>目前工作：</strong>{data.npcAgency.agendas[actor.id].title}</p>
       <p><strong>所在位置：</strong>{data.npcAgency.agendas[actor.id].location} · <strong>行動狀態：</strong>{data.npcAgency.agendas[actor.id].status}</p>

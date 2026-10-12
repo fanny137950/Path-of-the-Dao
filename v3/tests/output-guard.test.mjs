@@ -28,8 +28,8 @@ test('OpenRouter retries once after empty 200/content=null and increases output 
  }});
  assert.equal(response.text,'許秋雁指向日課冊。');
  assert.equal(requests.length,2);
- assert.equal(requests[0].max_tokens,1600);
- assert.equal(requests[1].max_tokens,2200);
+ assert.equal(requests[0].max_tokens,2800);
+ assert.equal(requests[1].max_tokens,4000);
  assert.deepEqual(requests[0].reasoning,{effort:'low',exclude:true});
  assert.deepEqual(requests[0].provider.max_price,{prompt:0,completion:0,request:0});
  assert.ok(!JSON.stringify(response).includes('sk-or-fake'));

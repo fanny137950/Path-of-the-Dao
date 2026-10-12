@@ -88,6 +88,11 @@ export function advanceEventCalendar(world,from,to){
  seedRecurringEvents(calendar,from,to);
  for(const e of calendar.events){
   if(e.state==='completed'||e.state==='cancelled')continue;
+  if(world.gmManaged){
+   // A scheduled checkpoint is a plan, not proof that anyone performed it.
+   e.state=to>=e.end?'completed':to>=e.start?'active':'scheduled';
+   continue;
+  }
   for(const stage of e.stages){
    if(stage.at<=from||stage.at>to||e.completed.includes(stage.id))continue;
    e.completed.push(stage.id);

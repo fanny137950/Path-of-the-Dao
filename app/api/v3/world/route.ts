@@ -1,3 +1,5 @@
+// @ts-ignore - bounded original conversation roles
+import {providerConversation} from '../../../../v3/server/conversation-memory.mjs';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../../chatgpt-auth';
 // @ts-ignore - module is authored in JS
@@ -6,16 +8,10 @@ import {initialV3World,validatedWorld,playerWorld,developerWorld,gmContext,commi
 import {generateGMResponse} from '../../../../v3/server/openai.mjs';
 // @ts-ignore - module is authored in JS
 import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
-// @ts-ignore - conservative objective-action stability filter
-import {stabilizeDecisiveAction} from '../../../../v3/server/outcome-stability.mjs';
-// @ts-ignore - backend-only GM initiative director
-import {nextBeatDirective,assessContinueReply,retryContinueDirective,isContinueIntent} from '../../../../v3/server/gm-initiative.mjs';
 // @ts-ignore - backend scene jump planner
 import {sceneJumpPlan,prepareSceneJump} from '../../../../v3/server/scene-jump.mjs';
 // @ts-ignore - backend narration fact guard
 import {checkWorldFacts,correctionDirective} from '../../../../v3/server/world-fact-guard.mjs';
-// @ts-ignore - explicit action adjudication quality gate
-import {assessActionResolution,actionResolutionDirective} from '../../../../v3/server/action-resolution.mjs';
 // @ts-ignore - pure GM prompt contract
 import {GM_INSTRUCTIONS,currentTurnDirective} from '../../../../v3/server/gm-prompt.mjs';
 
@@ -69,7 +65,7 @@ export async function POST(request:Request){
   const raw=await request.text();if(raw.length>12000)return reply({error:'請求過長'},413);
   const body=JSON.parse(raw);
   if(body.op==='new'){
-   const id=crypto.randomUUID(),world=initialV3World(id);
+   const id=crypto.randomUUID(),world={...initialV3World(id),gmManaged:true};
    await requireDB().prepare('INSERT INTO worlds (id,owner,name,revision,state,created) VALUES (?,?,?,?,?,?)')
     .bind(id,user.userId,'問道九州 V3 · 洛河',0,JSON.stringify(world),new Date().toISOString()).run();
    return reply(playerWorld(world),201);
@@ -118,11 +114,11 @@ export async function POST(request:Request){
   const key=typeof body.apiKey==='string'?body.apiKey:'';
   if(key.length>300)return reply({error:'API Key 無效'},400);
   const model=typeof body.model==='string'?body.model:undefined;
+  world.gmManaged=true;
   const scenePlan=!isTimeAdvance?sceneJumpPlan(world,text):null;
   if(scenePlan?.blocked)return reply({error:scenePlan.reason||'無法跳轉到指定活動'},400);
   const actingWorld=scenePlan?prepareSceneJump(world,scenePlan):world;
   let answer:string,usage:null|{totalTokens?:number}=null;
-  const progressionDirective=!isTimeAdvance&&!scenePlan?nextBeatDirective(actingWorld,text):'';
   if(mode==='demo')answer=isTimeAdvance
    ?'洛河在原處等待，時間緩緩流逝。來往弟子換了幾批，周遭的宗務照常運作。\n\n（示範模式不會產生動態 NPC 對話，請使用 AI 模式體驗故事。）'
    :'韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
@@ -130,33 +126,23 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective+progressionDirective+(scenePlan?'\n\n'+scenePlan.directive:'')+actionResolutionDirective(text),input:gmContext(actingWorld,text)+'\n\n'+currentTurnDirective(actingWorld,text,{sceneJump:!!scenePlan,isTimeAdvance}),maxOutputTokens:1000};
+   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective+(scenePlan?'\n\n'+scenePlan.directive:''),conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false})+'\n\n'+currentTurnDirective(actingWorld,text,{sceneJump:!!scenePlan,isTimeAdvance}),maxOutputTokens:2800};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
    const result=await generate(args.instructions);
    answer=result.text;usage=result.usage;
-   const quality=assessContinueReply(text,answer);
    const facts=checkWorldFacts(actingWorld,answer);
-   const action=assessActionResolution(text,answer);
-   if((!quality.ok&&isContinueIntent(text))||!facts.ok||!action.ok){
-    // Draft is never saved. Retry only clearly stalled "繼續" turns, at most once.
-    const retry=await generate(args.instructions+
-     (!quality.ok&&isContinueIntent(text)?retryContinueDirective(quality):'')+
-     (!facts.ok?correctionDirective(facts):'')+
-     (!action.ok?actionResolutionDirective(text,action):''));
+   if(!facts.ok){
+    const retry=await generate(args.instructions+correctionDirective(facts));
     answer=retry.text;
     usage={totalTokens:(result.usage?.totalTokens||0)+(retry.usage?.totalTokens||0)};
-    if((isContinueIntent(text)&&!assessContinueReply(text,answer).ok)||!checkWorldFacts(actingWorld,answer).ok||!assessActionResolution(text,answer).ok){
-     return reply({error:'GM 回覆未通過敘事一致性檢查，世界與遊戲時間未儲存，請重試。'},502);
-    }
+    if(!checkWorldFacts(actingWorld,answer).ok)return reply({error:'GM 回覆與既定人物資料矛盾，本回合未存檔，請重試。'},502);
    }
   }
-  answer=stabilizeDecisiveAction(actingWorld,text,answer);
-  if(mode==='demo'&&!checkWorldFacts(actingWorld,answer).ok)
-   return reply({error:'示範模式回覆不符合世界設定，未儲存。'},502);
+
   const next=commitV3Turn(actingWorld,text,answer,body.requestId,
-   isTimeAdvance?{advanceMinutes:requestedMinutes}:scenePlan?{advanceMinutes:0,sceneJump:{eventId:scenePlan.eventId,minutes:scenePlan.minutes}}:{});
+   isTimeAdvance?{advanceMinutes:requestedMinutes}:scenePlan?{sceneJump:{eventId:scenePlan.eventId,minutes:scenePlan.minutes}}:{});
   const committed=next.events.find((event:{requestId?:string})=>event.requestId===body.requestId);
   committed.request=identity;
   // Compare-and-swap: no partial turn or lost concurrent update.

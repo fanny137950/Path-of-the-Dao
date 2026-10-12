@@ -17,7 +17,7 @@ export function checkWorldFacts(world,reply){
   }
  }
  const now=(world.day-1)*1440+world.minute;
- for(const e of world.eventCalendar?.events||[]){
+ for(const e of (world.gmManaged?[]:world.eventCalendar?.events||[])){
   if(e.state==='cancelled'||e.start<=now||e.start>now+1440)continue;
   const name=e.id==='twelve-peaks-selection'?'十二峰初選':e.name;
   if(cut(reply).includes(name)&&/(?:已經|已|正式)(?:開始|開幕|啟動)/.test(cut(reply).slice(cut(reply).indexOf(name),cut(reply).indexOf(name)+40))&&
