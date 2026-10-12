@@ -169,3 +169,29 @@
 .v3-shell[data-reading="large"] .v3-assistant .v3-content{font-size:19px;line-height:2.2}
 @media(max-width:760px){.v3-sidebar{background:#152b2b}.v3-header{padding:14px 17px;min-height:76px}.v3-header h1{font-size:19px}.v3-messages{padding:23px 18px 32px;gap:25px}.v3-chapter{padding:20px 0 27px}.v3-chapter h2{font-size:31px}.v3-assistant .v3-content{padding-left:14px}.v3-user{max-width:90%}.v3-compose{padding:10px 12px max(12px,env(safe-area-inset-bottom))}.v3-content{font-size:15px}.v3-header-right{gap:8px}}
 @media(prefers-reduced-motion:reduce){.v3-shell *{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Selectable dark reading theme (only the game, never the global site). */
+.v3-shell[data-theme="dark"]{--v3-bg:#101b1c;--v3-panel:#152224;--v3-border:#acbcaf30;--v3-muted:#9eafa5;--v3-text:#e7e8df;--v3-gold:#d9bc85;--background:#152224;background:#101b1c;color:#e7e8df}
+.v3-shell[data-theme="dark"] .v3-workspace{background:radial-gradient(ellipse at 55% 0%,#25403788,transparent 65%),#101b1c}
+.v3-shell[data-theme="dark"] .v3-header{background:#142324;border-bottom-color:#52685a6c;box-shadow:none}
+.v3-shell[data-theme="dark"] .v3-header h1,.v3-shell[data-theme="dark"] .v3-chapter h2{color:#e9e3d4}
+.v3-shell[data-theme="dark"] .v3-kicker,.v3-shell[data-theme="dark"] .v3-chapter>span,.v3-shell[data-theme="dark"] .v3-chapter:before{color:#d5ad75}
+.v3-shell[data-theme="dark"] .v3-world-clock,.v3-shell[data-theme="dark"] .v3-chapter p,.v3-shell[data-theme="dark"] .v3-label-muted,.v3-shell[data-theme="dark"] .v3-composer-hint{color:#9ea9a0}
+.v3-shell[data-theme="dark"] .v3-assistant .v3-content{color:#d9dfd7}
+.v3-shell[data-theme="dark"] .v3-spoken,.v3-shell[data-theme="dark"] .v3-content strong{color:#f4f1df!important}
+.v3-shell[data-theme="dark"] .v3-assistant .v3-label{color:#b4c8ad}
+.v3-shell[data-theme="dark"] .v3-user{background:#1c3634;border-color:#4e6c60;box-shadow:none}
+.v3-shell[data-theme="dark"] .v3-user .v3-content{color:#e0ece1}
+.v3-shell[data-theme="dark"] .v3-user .v3-label{color:#bdd5c2}
+.v3-shell[data-theme="dark"] .v3-avatar{background:#416c5d}
+.v3-shell[data-theme="dark"] .v3-compose{background:linear-gradient(0deg,#101b1c 70%,#101b1c00)}
+.v3-shell[data-theme="dark"] .v3-composer-box{background:#1a2b2a;border-color:#58736a;box-shadow:0 10px 30px #0004}
+.v3-shell[data-theme="dark"] .v3-composer-box textarea{color:#f0f2ea}
+.v3-shell[data-theme="dark"] .v3-composer-box textarea::placeholder{color:#9aaba1}
+.v3-shell[data-theme="dark"] .v3-reply-options{border-top-color:#52675b}
+.v3-shell[data-theme="dark"] .v3-reply-options>p,.v3-shell[data-theme="dark"] .v3-options-heading{color:#c9ba99}
+.v3-shell[data-theme="dark"] .v3-option-grid button{color:#e2e9db!important;background:#21332e!important;border-color:#5c7867!important}
+.v3-shell[data-theme="dark"] .v3-option-grid button:hover{background:#314940!important}
+.v3-shell[data-theme="dark"] .v3-dialog{--v3-bg:#152224;--v3-panel:#1b2b2a;--v3-text:#e5e9dc;--v3-muted:#a8b6a7;--v3-border:#a0b49a44;background:#182827;color:#e4e8df;border-color:#547063}
+.v3-shell[data-theme="dark"] .v3-dialog h2,.v3-shell[data-theme="dark"] .v3-dialog button{color:#e5e9df}
+.v3-shell[data-theme="dark"] .v3-connection-button{background:#213731;color:#dbe9db;border-color:#5b7967}
