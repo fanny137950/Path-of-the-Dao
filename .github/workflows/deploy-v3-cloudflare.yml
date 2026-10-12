@@ -1,10 +1,10 @@
-name: Deploy V3 to Cloudflare
+name: Diagnose or Deploy WenDao Cloudflare
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: '輸入 wendao-living-world 才允許覆蓋現有 Worker'
+        description: '輸入 wendao-living-world 以確認目標 Worker（diagnose 不會部署）'
         required: true
         type: string
       mode:
