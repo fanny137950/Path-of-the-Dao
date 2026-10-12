@@ -11,7 +11,7 @@ const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Ca
 export async function GET(){
  const user=await getChatGPTUser();
  if(!user)return reply({error:'請先登入'},401);
- return reply(publicAIConfig(serverAIConfig(env,user.userId)));
+ return reply({...publicAIConfig(serverAIConfig(env,user.userId)),userId:user.userId});
 }
 export async function POST(request:Request){
  try{
