@@ -154,7 +154,8 @@ export function gmContext(world,userText,{includeDialogue=true}={}){
    '\n【只有'+actor.name+'經歷或獲知的事件】'+(memory||'沒有相關舊事')+'。'+notes;
  }).join('\n');
 
- const durable=recallDurableMemory(world,userText,{limit:5,maxChars:1250});
+ const recallQuery=userText+' '+world.messages.slice(-6).map(m=>visibleNarrative(m.content).slice(-450)).join(' ')+' '+present.map(n=>n.name).join('、');
+ const durable=recallDurableMemory(world,recallQuery,{limit:5,maxChars:1250});
  const chapters=recallChapters(world,userText,3)
   .map(c=>'【舊章節第'+c.from+'—'+c.to+'回合】'+shorten(c.text,650)).join('\n');
  const expectedRoot=pendingRootResult(world,userText);
@@ -175,7 +176,7 @@ export function gmContext(world,userText,{includeDialogue=true}={}){
   '【GM主動性】先判斷最新玩家輸入究竟是台詞、立即動作、內心想法或幕外快轉。已宣告的動作必須當回合處理，不得改成要求玩家再選一次。NPC保有自主性，但不能替洛河做主。'
  ].filter(Boolean);
  const optional=[
-  gmNotebookContext(world,userText),
+  gmNotebookContext(world,recallQuery),
   people.slice(0,1500),
   loreForGM(world,userText,1050),
   episodicMemoriesForGM(world,userText,850),

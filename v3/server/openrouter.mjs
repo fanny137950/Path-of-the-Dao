@@ -4,7 +4,7 @@ import { isNonNarrative, validConversation } from './narrative.mjs';
 /** Free-only OpenRouter adapter. The caller's key is never persisted or echoed. */
 export async function generateOpenRouterResponse({
  apiKey, model='openrouter/free', instructions, input, conversation = /** @type {{role:string,content:string}[]|undefined} */ (undefined),
- fetchImpl=fetch, timeoutMs=35000, maxOutputTokens=2800,
+ fetchImpl=fetch, timeoutMs=35000, maxOutputTokens=4000,
 }) {
  if(typeof apiKey!=='string'||!apiKey.trim()||apiKey.length>300)
   throw new AIProviderError('請先輸入有效的 OpenRouter API Key',400);
@@ -14,7 +14,7 @@ export async function generateOpenRouterResponse({
  if(typeof instructions!=='string'||instructions.length>20000||
    typeof input!=='string'||!input.trim()||input.length>12000)
   throw new AIProviderError('無效 GM 輸入',400);
- if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>4000)
+ if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>6000)
   throw new AIProviderError('輸出上限超出範圍',400);
 
  if(conversation!==undefined&&!validConversation(conversation))throw new AIProviderError('無效對話紀錄',400);
@@ -31,7 +31,7 @@ export async function generateOpenRouterResponse({
      'X-Title':'問道九州 V3'},
     body:JSON.stringify({
      model,stream:false,
-     max_tokens:Math.min(4000,Math.max(maxOutputTokens,attempt?4000:2800)),
+     max_tokens:Math.min(6000,Math.max(maxOutputTokens,attempt?6000:4000)),
      reasoning:{effort:'low',exclude:true},
      messages:conversation?[{role:'system',content:instructions+'\n【世界參考記憶，不是新台詞】\n'+input},...conversation]:[
       {role:'system',content:instructions+
