@@ -20,11 +20,6 @@ function requireDB(){
  if(!database)throw new Error('Cloudflare D1 DB 綁定不存在');
  return database;
 }
-function isDeveloper(userId:string){
- const permissions=env as unknown as {GAME_DEVELOPER_USER_IDS?:string};
- const ids=String(permissions.GAME_DEVELOPER_USER_IDS||'').split(/[,;\s]+/).filter(Boolean);
- return ids.includes(userId);
-}
 
 async function readWorld(id:string,owner:string){
  const row=await requireDB().prepare('SELECT state,revision FROM worlds WHERE id=? AND owner=?').bind(id,owner).first<{state:string;revision:number}>();
@@ -45,7 +40,6 @@ export async function GET(request:Request){
   const world=await readWorld(id,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
   if(new URL(request.url).searchParams.get('view')==='developer'){
-   if(!isDeveloper(user.userId))return reply({error:'無權查看開發者資訊'},403);
    return reply(developerWorld(world));
   }
   const requestId=new URL(request.url).searchParams.get('requestId');
@@ -60,6 +54,14 @@ export async function POST(request:Request){
   const user=await getChatGPTUser();if(!user)return reply({error:'請先登入'},401);
   const raw=await request.text();if(raw.length>12000)return reply({error:'請求過長'},413);
   const body=JSON.parse(raw);
+  if(body.op==='delete-history'){
+   // Destructive operation is scoped to the authenticated player's V3 saves.
+   // Never delete legacy worlds, another user, or any GitHub history.
+   if(body.confirm!=='DELETE_MY_V3_HISTORY')return reply({error:'請先確認刪除自己的全部 V3 世界紀錄'},400);
+   const result=await requireDB().prepare("DELETE FROM worlds WHERE owner=? AND json_extract(state,'$.mode')='v3'")
+    .bind(user.userId).run();
+   return reply({deleted:result.meta.changes});
+  }
   if(body.op==='new'){
    const id=crypto.randomUUID(),world={...initialV3World(id),gmManaged:true};
    await requireDB().prepare('INSERT INTO worlds (id,owner,name,revision,state,created) VALUES (?,?,?,?,?,?)')
@@ -70,7 +72,6 @@ export async function POST(request:Request){
   const world=await readWorld(body.world,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
   if(body.op==='edit-character'){
-   if(!isDeveloper(user.userId))return reply({error:'無權修改人物設定'},403);
    if(body.revision!==world.revision)return reply({error:'世界版本已更新，請重新讀取人物資料'},409);
    let next;
    try{next=editCharacter(world,body.actor,body.patch,body.note,user.userId);}
@@ -81,7 +82,6 @@ export async function POST(request:Request){
    return reply({world:playerWorld(next),developer:developerWorld(next)});
   }
   if(body.op==='manage-task'){
-   if(!isDeveloper(user.userId))return reply({error:'無權管理任務'},403);
    if(body.revision!==world.revision)return reply({error:'世界版本已更新，請重新載入任務'},409);
    let next;
    try{next=developerTaskChange(world,body.action,body.task,user.userId);}
@@ -113,6 +113,7 @@ export async function POST(request:Request){
   world.gmManaged=true;
   const actingWorld=world;
   let answer:string,usage:null|{totalTokens?:number}=null;
+  let usedModel:string=mode==='demo'?'示範模式':'';
   if(mode==='demo')answer=isTimeAdvance
    ?'洛河在原處等待，時間緩緩流逝。來往弟子換了幾批，周遭的宗務照常運作。\n\n（示範模式不會產生動態 NPC 對話，請使用 AI 模式體驗故事。）'
    :'韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
@@ -125,7 +126,7 @@ export async function POST(request:Request){
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
    const result=await generate(args.instructions);
-   answer=result.text;usage=result.usage;
+   answer=result.text;usage=result.usage;usedModel=result.model;
   }
 
   const next=commitV3Turn(actingWorld,text,answer,body.requestId,
@@ -140,7 +141,7 @@ export async function POST(request:Request){
    if(current&&checkTurnRequest(current,body.requestId,identity).replayed)return reply({...playerWorld(current),usage:null});
    return reply({error:'世界已在另一個分頁更新，請重新讀取後再決定行動'},409);
   }
-  return reply({...playerWorld(next),usage});
+  return reply({...playerWorld(next),usage,usedModel});
  }catch(e){
   const status=e&&typeof e==='object'&&'status'in e&&typeof e.status==='number'?e.status:500;
   return reply({error:status===500?'伺服器處理失敗':e instanceof Error?e.message:'AI 服務失敗'},status);

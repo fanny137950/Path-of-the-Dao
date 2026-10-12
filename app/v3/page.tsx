@@ -9,7 +9,7 @@ type Msg={role:'user'|'assistant';content:string};
 type Mode='demo'|'ai'|'openrouter';
 type Suggestion={label:string;text:string;kind?:'action'|'advance'};
 type Quest={id:string;title:string;type:string;status:string;description:string;objective:string;progress:number;updatedDay:number};
-type WorldView={journal?:Quest[];confirmedRequestId?:string|null;suggestions?:Suggestion[];id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;error?:string};
+type WorldView={journal?:Quest[];confirmedRequestId?:string|null;suggestions?:Suggestion[];id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;usedModel?:string;error?:string};
 type WorldEntry={id:string;name:string;revision:number;created:string};
 type Pending={op?:'turn'|'advance-time';advanceMinutes?:number;world:string;revision:number;requestId:string;text:string;mode:Mode;model:string};
 const worldKey='wendao-v3-chat-first-world';
@@ -23,6 +23,7 @@ export default function V3(){
  const [error,setError]=useState('');const [mode,setMode]=useState<Mode>('openrouter');
  const [connection,setConnection]=useState('');const [testing,setTesting]=useState(false);
  const [turn,setTurn]=useState(0);const [usage,setUsage]=useState<number|null>(null);
+ const [usedModel,setUsedModel]=useState('');
  const [worldId,setWorldId]=useState('');const [worlds,setWorlds]=useState<WorldEntry[]>([]);
  const [loading,setLoading]=useState(true);const [day,setDay]=useState(1);const [minute,setMinute]=useState(480);
  const [location,setLocation]=useState('太虛宗山門');const [suggestions,setSuggestions]=useState<Suggestion[]>([]);
@@ -48,6 +49,7 @@ export default function V3(){
   setWorldId(world.id);setMessages(world.messages);setTurn(world.revision);
   setDay(world.day);setMinute(world.minute);setLocation(world.location);setSuggestions(world.suggestions||[]);setJournal(world.journal||[]);
   setUsage(typeof world.usage?.totalTokens==='number'?world.usage.totalTokens:null);
+  if(typeof world.usedModel==='string')setUsedModel(world.usedModel);
   localStorage.setItem(worldKey,world.id);
  }
  async function listWorlds(){
@@ -116,14 +118,14 @@ export default function V3(){
 
  function selectMode(next:Mode){
   const nextModel=next==='ai'?'gpt-4.1-mini':'openrouter/free';
-  setMode(next);setModel(nextModel);setApiKey('');setConnection('');
+  setMode(next);setModel(nextModel);setApiKey('');setConnection('');setUsedModel('');
   localStorage.setItem(preferencesKey,JSON.stringify({mode:next,model:nextModel}));
  }
  async function testConnection(){
   if(testing||busy||!apiKey.trim())return;
-  setTesting(true);setConnection('正在向免費模型取得測試回覆……');
+  setTesting(true);setConnection('正在確認所選模型的連線……');
   try{
-   const res=await fetch('/api/v3/connection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:apiKey.trim(),model})});
+   const res=await fetch('/api/v3/connection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:apiKey.trim(),model:model.trim(),mode})});
    const data=await res.json() as {error?:string;model:string;sample:string};if(!res.ok)throw Error(data.error||'連線失敗');
    setConnection('連線成功 · '+data.model+'\n'+data.sample);
   }catch(e){setConnection(e instanceof Error?e.message:'連線失敗')}
@@ -147,9 +149,27 @@ export default function V3(){
   try{await createWorld()}catch(e){setError(e instanceof Error?e.message:'建立世界失敗')}
   finally{setLoading(false)}
  }
+ async function clearHistory(){
+  if(busy||loading||pending)return;
+  if(!window.confirm('將永久刪除目前帳號的所有 V3 世界線、對話、人物狀態及任務存檔。此操作無法復原，確定要繼續？'))return;
+  const check=window.prompt('為防止誤刪，請輸入「刪除所有紀錄」進行確認：');
+  if(check!=='刪除所有紀錄'){setError('沒有確認刪除，資料保持原樣。');return;}
+  setLoading(true);setError('');
+  try{
+   const res=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'delete-history',confirm:'DELETE_MY_V3_HISTORY'})});
+   const data=await res.json() as {deleted?:number;error?:string};
+   if(!res.ok)throw Error(data.error||'無法清除世界紀錄');
+   rememberPending(null);localStorage.removeItem(worldKey);
+   setMessages([]);setWorlds([]);setJournal([]);setSuggestions([]);setUsage(null);setUsedModel('');setWorldId('');
+   setTurn(0);setText('');setVisibleCount(60);setSettings(false);setSidebar(false);setDev(false);
+   await createWorld();
+   setError('已清除 '+(data.deleted??0)+' 筆個人 V3 世界存檔，並建立全新世界。');
+  }catch(e){setError(e instanceof Error?e.message:'清除紀錄失敗');}
+  finally{setLoading(false);}
+ }
  async function send(advanceMinutes?:number){
   const value=text.trim();if(inFlight.current||busy||testing||loading||!worldId||(!pendingRef.current&&!value&&!advanceMinutes))return;
-  const request:Pending=pendingRef.current||{op:advanceMinutes?'advance-time':'turn',advanceMinutes,world:worldId,revision:turn,requestId:crypto.randomUUID(),text:advanceMinutes?'等待時間流逝':value,mode,model};
+  const request:Pending=pendingRef.current||{op:advanceMinutes?'advance-time':'turn',advanceMinutes,world:worldId,revision:turn,requestId:crypto.randomUUID(),text:advanceMinutes?'等待時間流逝':value,mode,model:model.trim()};
   if(request.mode!=='demo'&&!apiKey.trim()){setSettings(true);setError('請先在 AI 設定輸入本次頁面的 API Key。');return;}
   inFlight.current=true;setBusy(true);setError('');setText('');followLatest.current=true;
   try{
@@ -205,9 +225,10 @@ export default function V3(){
  <section className="v3-panel"><fieldset disabled={loading||busy||testing||!!pending}><legend>選擇對話模式</legend><div className="v3-provider-grid">{([['openrouter','免費 AI','OpenRouter'],['demo','先試試介面','示範模式，非 AI'],['ai','OpenAI','依 API 用量計費']] as [Mode,string,string][]).map(([value,label,description])=><label className={'v3-provider'+(mode===value?' selected':'')} key={value}><input type="radio" checked={mode===value} onChange={()=>selectMode(value)}/><span><strong>{label}</strong><small>{description}</small></span></label>)}</div>
  {mode!=='demo'&&<label className="v3-field">模型 ID<input value={model} onChange={e=>{setModel(e.target.value);setConnection('');localStorage.setItem(preferencesKey,JSON.stringify({mode,model:e.target.value}))}} maxLength={120}/></label>}</fieldset>
  {mode!=='demo'&&<><label className="v3-field">本次頁面 API Key<input type="password" autoComplete="off" value={apiKey} disabled={loading||busy||testing} onChange={e=>{setApiKey(e.target.value);setConnection('')}} placeholder={mode==='openrouter'?'sk-or-v1-…':'sk-…'}/></label><p className="v3-setting-help">金鑰只保留在當次頁面，重新整理後需再輸入。對話會透過遊戲伺服器送給所選 AI 服務。</p>
- {mode==='openrouter'&&<><div className="v3-key-link"><a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">取得 OpenRouter Key ↗</a><span>僅使用免費模型，不自動切換付費。</span></div><button className="v3-test-button" onClick={()=>void testConnection()} disabled={testing||busy||!apiKey.trim()}>{testing?<><LoaderCircle size={16}/>正在取得測試回覆…</>:'測試 AI 連線'}</button>{connection&&<p className={'v3-connection-result'+(connection.startsWith('連線成功')?' is-success':'')} role="status">{connection}</p>}</>}</>}
+ {mode==='ai'&&<button className="v3-test-button" onClick={()=>void testConnection()} disabled={testing||busy||!apiKey.trim()}>{testing?'正在測試 OpenAI 模型…':'測試 OpenAI 模型與 API Key'}</button>}
+ {mode==='openrouter'&&<><div className="v3-key-link"><a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">取得 OpenRouter Key ↗</a><span>僅使用免費模型，不自動切換付費。</span></div><button className="v3-test-button" onClick={()=>void testConnection()} disabled={testing||busy||!apiKey.trim()}>{testing?<><LoaderCircle size={16}/>正在取得測試回覆…</>:'測試 AI 連線'}</button></>}{connection&&<p className={'v3-connection-result'+(connection.startsWith('連線成功')?' is-success':'')} role="status">{connection}</p>}</>}
  <fieldset className="v3-reading"><legend>閱讀字級</legend><div>{(['normal','large'] as const).map(size=><button key={size} aria-pressed={reading===size} onClick={()=>{setReading(size);localStorage.setItem('wendao-v3-reading',size)}}>{size==='normal'?'標準':'放大'}</button>)}</div></fieldset>
- <details className="v3-advanced"><summary>進階與人物檔案</summary><p>目前模型：{model}{usage!==null?' · 上回合 '+usage+' tokens':''}</p><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('people');setDev(true)}}><BookOpen size={15}/>開發者人物檔案</button><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('tasks');setDev(true)}}><BookOpen size={15}/>開發者任務管理</button><p>人物檔案須經伺服器授權，只有開發者可以查看。</p></details>
+ <details className="v3-advanced"><summary>進階與人物檔案</summary><p>已選模型：{model}{usedModel?' · 上回合實際使用：'+usedModel:''}{usage!==null?' · 上回合 '+usage+' tokens':''}</p><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('people');setDev(true)}}><BookOpen size={15}/>開發者人物檔案</button><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('tasks');setDev(true)}}><BookOpen size={15}/>開發者任務管理</button><p>只有已登入且擁有這個世界線的帳號可以查看或編輯這份後台資料。</p><button type="button" disabled={busy||loading||!!pending} className="v3-danger-button" onClick={()=>void clearHistory()}>永久清除我所有 V3 世界線及對話紀錄</button></details>
  <button className="v3-done-button" onClick={()=>setSettings(false)}>{mode==='demo'?'開始試玩':'回到故事'}<ChevronRight size={16}/></button>
  </section></div></dialog>
  <dialog ref={developerDialog} className="v3-dialog v3-inspector" onCancel={()=>setDev(false)}><div className="v3-dialog-inner"><header className="v3-dialog-header"><h2>{developerTab==='tasks'?'任務管理':'人物檔案'}</h2><button className="v3-icon" aria-label="關閉開發者後台" onClick={()=>setDev(false)}><X size={20}/></button></header><nav className="v3-developer-tabs" aria-label="開發者後台"><button aria-pressed={developerTab==='people'} onClick={()=>setDeveloperTab('people')}>人物管理</button><button aria-pressed={developerTab==='tasks'} onClick={()=>setDeveloperTab('tasks')}>任務管理</button></nav>{dev&&worldId&&!pending&&(developerTab==='people'?<V3DeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/>:<V3TaskDeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/>)}</div></dialog>
