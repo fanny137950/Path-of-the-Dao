@@ -4,7 +4,7 @@ import {generateGMResponse} from '../../../../v3/server/openai.mjs';
 // @ts-ignore — server-only plain JS adapter
 import {generateOpenRouterResponse} from '../../../../v3/server/openrouter.mjs';
 export const dynamic='force-dynamic';
-const instructions=`你是《問道九州》V3 的中央 GM。玩家扮演十五歲少女洛河，剛抵達太虛宗參加入門測試。保留修仙世界觀：太虛宗、棲風峰、沈滄月（冷靜嚴格的峰主）、晏清辭（嚴謹師姐）、江離（溫和愛鬧師兄）、顧長青。不得擅自代玩家做重大決定。以繁體中文輸出一段連續、自然、節奏俐落的場景，NPC 台詞與動作可放在同一則回覆。NPC 不全知，不為討好玩家而破壞修為差距。避免每回合都製造危機。此為無持久世界模擬的早期試玩版，不要聲稱你已更新資料庫。依照對話歷史維持一致性。`;
+const instructions=`你是《問道九州》V3 的中央 GM。玩家扮演十五歲少女洛河，剛抵達太虛宗參加入門測試。保留修仙世界觀：太虛宗、棲風峰、沈滄月（冷靜嚴格的峰主）、晏清辭（嚴謹師姐）、江離（溫和愛鬧師兄）、顧長青。不得擅自代玩家做重大決定。以繁體中文輸出完整、生動且連續的場景，重視 NPC 自然的來回對話、多人物互動、動作與情緒，不要用一句話草草結束；簡單確認可以簡短，重要談話自然展開，NPC 台詞與動作可放在同一則回覆。NPC 不全知，不為討好玩家而破壞修為差距。避免每回合都製造危機。此為無持久世界模擬的早期試玩版，不要聲稱你已更新資料庫。依照對話歷史維持一致性。`;
 const demo=(text:string,turn:number)=>{
  if(turn===0)return `執事接過名冊，筆尖懸在紙上。
 
@@ -36,7 +36,7 @@ export async function POST(request:Request){
   const apiKey=typeof body.apiKey==='string'?body.apiKey:'';if(apiKey.length>300)return Response.json({error:'無效金鑰'},{status:400});
   const transcript=messages.map((m:any)=>`${m.role==='user'?'洛河':'GM'}：${m.content}`).join('\n\n');
   const result=body.mode==='openrouter'
-   ?await generateOpenRouterResponse({apiKey,model:body.model||'openrouter/free',instructions,input:transcript,maxOutputTokens:1000})
+   ?await generateOpenRouterResponse({apiKey,model:body.model||'openrouter/free',instructions,input:transcript,maxOutputTokens:2800})
    :await generateGMResponse({apiKey,model:body.model||'gpt-4.1-mini',instructions,input:transcript,maxOutputTokens:1000});
   return Response.json(result,{headers:{'Cache-Control':'no-store'}});
  }catch(e){return Response.json({error:e instanceof Error?e.message:'伺服器錯誤'},{status:e&&typeof e==='object'&&'status' in e&&typeof e.status==='number'?e.status:500,headers:{'Cache-Control':'no-store'}})}
