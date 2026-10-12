@@ -138,3 +138,34 @@
 .v3-content .v3-scene-heading{font-size:1em;line-height:1.7;color:var(--v3-gold);font-weight:500;margin:26px 0 16px}.v3-content .v3-scene-heading:first-child{margin-top:0}.v3-content ul{padding-left:1.4em;margin:0 0 18px}.v3-content li{margin:6px 0}
 
 .v3-shell .v3-danger-button{display:flex;align-items:center;gap:7px;margin-top:18px;padding:9px 12px;border:1px solid #c8787066;border-radius:8px;background:transparent;color:#e3a59e;font-size:12px;text-align:left}.v3-shell .v3-danger-button:hover{background:#a9453c22}.v3-shell .v3-danger-button:disabled{opacity:.5;cursor:not-allowed}
+
+
+/* Immersive Storybook V4 — fully scoped, preserves all gameplay and dialogs. */
+.v3-shell{--v3-bg:#f1eee5;--v3-panel:#faf8f2;--v3-border:#6c665a29;--v3-muted:#736e62;--v3-text:#242c27;--v3-gold:#956d3e;--background:#faf8f2;background:#f1eee5;color:#242c27;font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;font-size:15px}
+.v3-sidebar{background:#152b2b;color:#eee9dc;border-right:1px solid #38504c;padding:33px 22px 24px;width:264px}
+.v3-sidebar .v3-brand{margin-bottom:36px}.v3-brand strong{font-family:"Noto Serif TC","Songti TC",serif;font-size:24px;letter-spacing:5px}.v3-brand small{color:#b9c6b9;letter-spacing:1.4px}.v3-seal{border:1px solid #c4a16c!important;color:#e0c28a!important;background:#b99a5921;width:45px;height:49px;border-radius:5px}
+.v3-sidebar-label{color:#b7c3b6;letter-spacing:2.4px}.v3-sidebar-bottom p{color:#aebdb2}.v3-shell .v3-new-world{background:#c6a86b1f;color:#f0ddb9;border:1px solid #c6a86b59;border-radius:6px;padding:13px}
+.v3-world-card{background:#e1c18d12;border-left:2px solid #c9a16b}.v3-world-card p,.v3-world-card small{color:#c0cbbd}.v3-world-select select{background:#213d3c!important;color:#eee9dc!important;border:1px solid #65827a66!important;border-radius:6px}
+.v3-sidebar button:not(.v3-new-world){color:#e3e9df;border-color:#627a7152}.v3-sidebar button:hover{background:#ffffff12}
+.v3-workspace{background:radial-gradient(ellipse at 50% 5%,#ffffffc7,transparent 57%),repeating-linear-gradient(90deg,transparent 0px,transparent 71px,#8f7f6310 72px,#8f7f6310 73px),#f1eee5}
+.v3-header{background:#f8f6eeed;border-bottom:1px solid #8e80624d;min-height:92px;padding:19px clamp(22px,4.2vw,68px);box-shadow:0 2px 10px #433d2d08}
+.v3-kicker{color:#8b7254;letter-spacing:2.8px;font-size:10px}.v3-header h1{font-family:"Noto Serif TC","Songti TC",serif;color:#233b37;font-size:25px;letter-spacing:3px;font-weight:600}
+.v3-world-clock{color:#665f51;font-size:12px}.v3-shell .v3-connection-button{color:#354d45;background:#e8ece5;border:1px solid #b7c5b7;border-radius:99px;padding:8px 14px}
+.v3-status-dot{background:#b9825a}.v3-status-dot.has-key{background:#518c73}.v3-header .v3-icon{color:#38534e}
+.v3-timeline{scrollbar-color:#b5a98d99 transparent}.v3-messages{width:min(100%,900px);padding:45px clamp(23px,5vw,72px) 45px;gap:37px}
+.v3-chapter{padding:35px 0 45px;position:relative;border-bottom:1px solid #aa976f66;margin-bottom:9px}.v3-chapter:before{content:"✧  ·  ✧";display:block;font-size:18px;letter-spacing:15px;color:#b48e54;margin-bottom:14px}
+.v3-chapter>span{color:#99754c;font-size:12px;letter-spacing:8px}.v3-chapter h2{font-family:"Noto Serif TC","Songti TC",serif;color:#233b37;font-size:clamp(33px,4vw,46px);font-weight:600;letter-spacing:9px;margin:18px 0}.v3-chapter p{color:#706a5c;font-size:12px;letter-spacing:2px}
+.v3-assistant{padding:0 0 0 2px}.v3-assistant .v3-label{color:#6a795d;margin-bottom:15px;font-size:12px}.v3-narrator-mark{color:#ac874f;font-size:23px}.v3-label-muted{color:#9b9486}
+.v3-content{font-size:16px;line-height:2.15;letter-spacing:.55px}.v3-content p{margin-bottom:18px}.v3-assistant .v3-content{padding-left:31px;color:#363c32}.v3-spoken{color:#172f2c!important;font-weight:500}.v3-content strong{color:#183a35}
+.v3-user{background:#e4e9e1;border:1px solid #bed0c2;border-radius:14px 14px 4px 14px;max-width:76%;padding:16px 20px;box-shadow:0 4px 15px #243c310a}.v3-user .v3-label{color:#476858}.v3-avatar{background:#1f4640;color:#f3e7d3;border:0;width:25px;height:25px}.v3-user .v3-content{color:#244039;font-size:15px}.v3-assistant .v3-copy{color:#778774}
+.v3-reply-options{border-top:1px solid #bcad8b;margin-left:30px}.v3-options-heading{color:#87673e}.v3-option-grid button{color:#405246!important;background:#e7e5d9!important;border:1px solid #cabf9c!important;line-height:1.5}.v3-option-grid button:hover{background:#dedccf!important}.v3-reply-options>p{color:#797261}
+.v3-compose{background:linear-gradient(0deg,#f1eee5 70%,#f1eee500);width:min(100%,930px);padding:16px clamp(16px,4vw,60px) max(14px,env(safe-area-inset-bottom))}
+.v3-composer-box{background:#fffdf8;border:1px solid #bdaf91;box-shadow:0 10px 32px #534a3718;border-radius:12px}.v3-composer-box:focus-within{border-color:#547b69;box-shadow:0 0 0 3px #537b6920}.v3-composer-box textarea{color:#253a34;font-size:15px;min-height:66px}.v3-composer-box textarea::placeholder{color:#938b7a}.v3-composer-bottom{color:#7b7668}.v3-composer-hint{color:#79786f}
+.v3-shell .v3-send{background:#254e47!important;border-color:#254e47!important;color:#f9f1df!important;border-radius:8px!important}.v3-shell .v3-send:hover{background:#37665b!important}
+.v3-waiting{color:#566a5b}.v3-thinking-dots i{background:#4f7665}.v3-waiting small{color:#7b8478}
+.v3-shell .v3-jump{background:#254e47;color:white}.v3-error{color:#812d2d}.v3-retry-note,.v3-connect-note{color:#3d5548}
+.v3-dialog{--v3-bg:#f2eee5;--v3-panel:#fffdf8;--v3-text:#293a34;--v3-muted:#716b5f;--v3-border:#81735b38;background:#f9f6ef;color:#293a34;border:1px solid #c7bda8;box-shadow:0 20px 90px #122a2580}
+.v3-dialog button{color:#31483f}.v3-dialog h2{font-family:"Noto Serif TC","Songti TC",serif;color:#243e38}
+.v3-shell[data-reading="large"] .v3-assistant .v3-content{font-size:19px;line-height:2.2}
+@media(max-width:760px){.v3-sidebar{background:#152b2b}.v3-header{padding:14px 17px;min-height:76px}.v3-header h1{font-size:19px}.v3-messages{padding:23px 18px 32px;gap:25px}.v3-chapter{padding:20px 0 27px}.v3-chapter h2{font-size:31px}.v3-assistant .v3-content{padding-left:14px}.v3-user{max-width:90%}.v3-compose{padding:10px 12px max(12px,env(safe-area-inset-bottom))}.v3-content{font-size:15px}.v3-header-right{gap:8px}}
+@media(prefers-reduced-motion:reduce){.v3-shell *{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
