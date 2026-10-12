@@ -70,8 +70,22 @@ jobs:
 
       # No D1 migrations or credential changes: this release replaces only the
       # Worker code and static assets, preserving existing login secrets and data.
-      - name: Deploy Worker and assets
-        run: pnpm exec wrangler deploy --config dist/server/wrangler.standalone.json
+      - name: Deploy Worker and assets (fallback to embedded preview on asset API outage)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Prefer Cloudflare Static Assets. If Cloudflare's metadata or asset
+          # upload endpoints fail, use the already-tested embedded-preview mode.
+          if pnpm exec wrangler deploy --config dist/server/wrangler.standalone.json 2>&1 | tee /tmp/wendao-deploy.log; then
+            echo 'Standard static-assets deployment succeeded.'
+          elif grep -Eq 'assets-upload-session|Unable to fetch bindings, routes, or services metadata' /tmp/wendao-deploy.log; then
+            echo 'Cloudflare static-assets service unavailable; switching to embedded preview.'
+            node scripts/prepare-preview.mjs
+            pnpm exec wrangler deploy --config dist/server/wrangler.preview.json
+          else
+            echo 'Deployment failed for an unrelated reason; refusing fallback.'
+            exit 1
+          fi
 
       - name: Smoke-test site
         shell: bash
