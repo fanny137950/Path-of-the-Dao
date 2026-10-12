@@ -126,7 +126,7 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective+(scenePlan?'\n\n'+scenePlan.directive:''),conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false})+'\n\n'+currentTurnDirective(actingWorld,text,{sceneJump:!!scenePlan,isTimeAdvance}),maxOutputTokens:2800};
+   const args={apiKey:key,instructions:GM_INSTRUCTIONS+timeDirective+(scenePlan?'\n\n'+scenePlan.directive:''),conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false})+'\n\n'+currentTurnDirective(actingWorld,text,{sceneJump:!!scenePlan,isTimeAdvance}),maxOutputTokens:4000};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});

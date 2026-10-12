@@ -108,3 +108,13 @@ test('public event memory replaces scripted quest navigation, while hidden event
  assert.equal(playerWorld(next).journal[0].objective,'');
  assert.doesNotMatch(JSON.stringify(playerWorld(next)),/秘密來信/);
 });
+
+test('a bare continue recalls an older everyday errand from the active conversation',()=>{
+ const w=world();
+ w.gmMemories=[{id:'errand',revision:1,day:1,minute:480,text:'韓守一託洛河帶茶葉回去，洛河尚未交付。',knownBy:['registrar'],playerKnown:true}];
+ for(let i=0;i<10;i++)w.gmMemories.push({id:'other'+i,revision:i+2,day:1,minute:500+i,text:'另一處商隊完成第'+i+'批貨物點收。',knownBy:[],playerKnown:false});
+ w.messages.push({role:'assistant',content:'韓守一拿起空茶罐，翻找桌上的紙袋。'});
+ const c=gmContext(w,'繼續',{includeDialogue:false});
+ assert.match(c,/託洛河帶茶葉回去，洛河尚未交付/);
+ assert.doesNotMatch(JSON.stringify(playerWorld(w)),/另一處商隊/);
+});

@@ -19,13 +19,13 @@ export async function generateGMResponse({
   conversation = /** @type {{role:string,content:string}[]|undefined} */ (undefined),
   fetchImpl = fetch,
   timeoutMs = 30000,
-  maxOutputTokens = 2800,
+  maxOutputTokens = 4000,
 }) {
   if (typeof apiKey !== 'string' || !apiKey.trim()) throw new AIProviderError('伺服器未設定 AI API 金鑰', 503);
   if (typeof model !== 'string' || !/^[a-zA-Z0-9._-]{1,80}$/.test(model)) throw new AIProviderError('無效模型 ID', 400);
   if (typeof instructions !== 'string' || instructions.length > 20000) throw new AIProviderError('無效 GM 指示', 400);
   if (typeof input !== 'string' || !input.trim() || input.length > 12000) throw new AIProviderError('無效對話輸入', 400);
-  if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 4000) throw new AIProviderError('輸出上限超出範圍', 400);
+  if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 6000) throw new AIProviderError('輸出上限超出範圍', 400);
   if(conversation!==undefined&&!validConversation(conversation))throw new AIProviderError('無效對話紀錄',400);
   let response;
   try {
