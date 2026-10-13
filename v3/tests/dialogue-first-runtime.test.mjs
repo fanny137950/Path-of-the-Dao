@@ -18,7 +18,7 @@ test('conversational fast forward respects the requested scene without running o
   assert.deepEqual(prepared.npcs,w.npcs);
   const next=commitV3Turn(prepared,text,answer('接引代表請洛河談談自己的志向。',{elapsedMinutes:5}),'jump',{sceneJump:{eventId:plan.eventId,minutes:plan.minutes}});
   assert.equal(elapsedMinutes(next),785);
-  assert.doesNotMatch(next.npcs.registrar.memories.at(-1).text,/系統|可以直接/);
+  assert.deepEqual(next.npcs.registrar.memories,w.npcs.registrar.memories,'without an explicit GM knowledge record, an OOC skip cannot become NPC memory');
  }
  assert.equal(sceneJumpPlan(world(),'我直接衝向對手'),null);
  const free=sceneJumpPlan(world(),'系統 跳到第二天早餐');

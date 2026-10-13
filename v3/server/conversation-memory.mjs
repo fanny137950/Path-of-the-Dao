@@ -112,7 +112,7 @@ export function episodicMemoriesForGM(world,userText,maxChars=1350){
 }
 
 /** Send a contiguous suffix as actual conversation roles, not one giant user monologue. */
-export function providerConversation(world,text,maxChars=6500){
+export function providerConversation(world,text,maxChars=14500){
  const messages=[];
  let remaining=maxChars;
  for(let i=world.messages.length-1;i>=0;i--){

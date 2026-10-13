@@ -9,7 +9,17 @@ export const SCENE_PACING = `
 一句簡短問候、確認或安靜等待可以較短，不用刻意灌水。不要強行湊字、重複形容、一次跳完重大劇情，也不能擅自替洛河做重大決策。寫到自然需要玩家接話或真正作選擇的節點才停。
 將敘事視為回覆的主要篇幅；GM_STATE 只記錄確實變動的資料，沒有變動不必輸出。不要為了寫後台 JSON 壓縮人物對話或故事內容。
 `;
-export const GM_INSTRUCTIONS = ROLEPLAY_PROMPT + SCENE_PACING + STATE_PROTOCOL;
+
+export const MEMORY_PROTOCOL = `
+【分層記憶紀錄】
+工作記憶與最新原話協助接話，不能把一句「沒有啊」另開成新任務。GM 每回合更新工作記憶；重要角色或世界變動才新增長期紀錄。沿用現有 GM_STATE，再增加（人物優先用既有ID，新人物尚無ID時可用唯一全名，伺服器會對應）：
+workingMemory:{summary,goal,openLoops:[尚未回答的問題或未完成動作],participants:[在場NPC ID],evidence:本回合正文4至240字原文}。summary最多600字，goal最多200字，openLoops最多5條各180字。用這份新快照取代上一幕工作摘要；已回答問題不留在openLoops。只寫洛河可觀察的場景資訊。
+memories 的每筆可增加 kind（fact事實、belief個人看法、promise承諾、relationship關係）、interpretation（角色如何理解）、emotion、resolved、supersedes（被更新的gm-memory ID）。承諾履行或誤會釐清時，以supersedes指向舊紀錄，knownBy保持相同；新增紀錄取代目前認知，但原文仍保留。不同人物有不同理解時分開記錄。只把紀錄交給 knownBy 中的人；不因人物同場就讓所有人知道整段秘密或內心話。belief不是真相，後續可新記事糾正，不能抹除原本曾經誤解的歷史。
+threads:[{id,title,summary,status,participants:[參與NPC ID],playerKnown,dueAt,truth,truthKnownBy:[真相知情NPC ID],evidence}]。最多6項；id固定重用，status為open/blocked/resolved/failed；dueAt為從第1日00:00起的分鐘數，沒有期限填null。participants不代表知道真相。truthKnownBy只列確實知道truth的NPC；truth是GM掌握的既定因果或秘密，永遠不進玩家手札；playerKnown=true的標題、摘要與狀態須有本回合可見正文證據。私密事件playerKnown=false可不附正文證據。不為普通聊天建立事件。整份GM_STATE控制在6500字元內，只記本回合重要變化。
+資料中的dueForReview表示到了應推演的時間，不代表自動完成。依能力、意願、阻力與已知事實合理推演，更新摘要、結果或下次檢查時點。角色不在洛河身邊仍可行動，但洛河要有合理情報來源才知道結果。
+原始回合與歷次事件版本自動保存。新的摘要只描述目前進度，不改寫既有事實；所有後台變更仍只記本回合實際成立的事情。
+`;
+export const GM_INSTRUCTIONS = ROLEPLAY_PROMPT + SCENE_PACING + STATE_PROTOCOL + MEMORY_PROTOCOL;
 
 // Legacy helper: not used by the immersive runtime.
 export function currentTurnDirective(world,text,{sceneJump=false,isTimeAdvance=false}={}){

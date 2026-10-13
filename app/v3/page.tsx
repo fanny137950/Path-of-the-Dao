@@ -1,6 +1,9 @@
 'use client';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {ArrowUp,ArrowDown,Plus,Settings2,PanelLeft,BookOpen,Sparkles,X,Copy,Check,LoaderCircle,ChevronRight} from 'lucide-react';
+import V3WorldPanel,{type PlayerMemory,type PlayerProfile} from '../../components/v3-world-panel';
+import V3MemoryInspector from '../../components/v3-memory-inspector';
+import {GAME_RELEASE,GAME_RELEASE_NAME} from '../../v3/release.mjs';
 import StoryText from '../../components/v3-story-text';
 import './v3.css';
 import V3TaskDeveloperPanel from '../../components/v3-task-developer-panel';
@@ -9,7 +12,7 @@ type Msg={role:'user'|'assistant';content:string};
 type Mode='demo'|'ai'|'openrouter';
 type Suggestion={label:string;text:string;kind?:'action'|'advance'};
 type Quest={id:string;title:string;type:string;status:string;description:string;objective:string;progress:number;updatedDay:number};
-type WorldView={journal?:Quest[];confirmedRequestId?:string|null;suggestions?:Suggestion[];id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;usedModel?:string;error?:string};
+type WorldView={memory?:PlayerMemory;protagonist?:PlayerProfile;journal?:Quest[];confirmedRequestId?:string|null;suggestions?:Suggestion[];id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;usedModel?:string;error?:string};
 type WorldEntry={id:string;name:string;revision:number;created:string};
 type ServerAI={userId?:string;allowed:boolean;providers:{ai:{ready:boolean;models:string[]};openrouter:{ready:boolean;models:string[]}}};
 type Pending={op?:'turn'|'advance-time';advanceMinutes?:number;world:string;revision:number;requestId:string;text:string;mode:Mode;model:string};
@@ -17,6 +20,9 @@ const worldKey='wendao-v3-chat-first-world';
 const pendingKey='wendao-v3-pending-turn';
 const preferencesKey='wendao-v3-ai-preferences';
 export default function V3(){
+ const [memory,setMemory]=useState<PlayerMemory|null>(null),[profile,setProfile]=useState<PlayerProfile|null>(null);
+ const [notebookOpen,setNotebookOpen]=useState(false);const notebookDialog=useRef<HTMLDialogElement>(null);
+ const [build,setBuild]=useState<{release:string;revision:string|null}|null>(null);
  const [messages,setMessages]=useState<Msg[]>([]);
  const [text,setText]=useState('');const [busy,setBusy]=useState(false);
  const [model,setModel]=useState('gpt-4.1-mini');
@@ -30,7 +36,7 @@ export default function V3(){
  const [loading,setLoading]=useState(true);const [day,setDay]=useState(1);const [minute,setMinute]=useState(480);
  const [location,setLocation]=useState('太虛宗山門');const [suggestions,setSuggestions]=useState<Suggestion[]>([]);
  const [journal,setJournal]=useState<Quest[]>([]);const [journalOpen,setJournalOpen]=useState(false);
- const [developerTab,setDeveloperTab]=useState<'people'|'tasks'>('people');const journalDialog=useRef<HTMLDialogElement>(null);
+ const [developerTab,setDeveloperTab]=useState<'people'|'tasks'|'memory'>('people');const journalDialog=useRef<HTMLDialogElement>(null);
  const [sidebar,setSidebar]=useState(false);const [away,setAway]=useState(false);const [visibleCount,setVisibleCount]=useState(60);
  const [reading,setReading]=useState<'normal'|'large'>('normal');
  const [copied,setCopied]=useState<number|null>(null);const [elapsed,setElapsed]=useState(0);
@@ -48,6 +54,7 @@ export default function V3(){
  }
  function applyWorld(world:WorldView){
   if(!world.id||!Array.isArray(world.messages))throw Error('世界資料格式錯誤');
+  setMemory(world.memory||null);setProfile(world.protagonist||null);
   setWorldId(world.id);setMessages(world.messages);setTurn(world.revision);
   setDay(world.day);setMinute(world.minute);setLocation(world.location);setSuggestions(world.suggestions||[]);setJournal(world.journal||[]);
   setUsage(typeof world.usage?.totalTokens==='number'?world.usage.totalTokens:null);
@@ -75,6 +82,8 @@ export default function V3(){
   if(!response.ok)throw Error(data.error||'建立世界失敗');
   applyWorld(data);await listWorlds();
  }
+ useEffect(()=>{fetch('/api/v3/version',{cache:'no-store'}).then(async r=>r.ok?await r.json() as {release:string;revision:string|null}:null).then(setBuild).catch(()=>{});},[]);
+ useEffect(()=>{const modal=notebookDialog.current;if(notebookOpen&&!modal?.open)modal?.showModal();else if(!notebookOpen&&modal?.open)modal.close();},[notebookOpen]);
  useEffect(()=>{
   if(initializationStarted.current)return;
   initializationStarted.current=true;
@@ -232,14 +241,14 @@ export default function V3(){
   <button className="v3-new-world" onClick={reset} disabled={busy||loading||!!pending}><Plus size={17}/>開啟新世界</button>
   <div className="v3-sidebar-label">我的世界線</div>
   <label className="v3-world-select"><span className="v3-sr-only">世界線</span><select aria-label="世界線" value={worldId} disabled={busy||loading||!!pending} onChange={e=>void switchWorld(e.target.value)}>{worlds.map(w=><option key={w.id} value={w.id}>{w.name.replace('問道九州 V3 · ','')} · {w.created.slice(5,10)} · {w.id.slice(0,4)}</option>)}</select></label>
-  <div className="v3-world-card"><BookOpen size={18}/><div><strong>太虛初識</strong><p>第 {day} 日 · {location}</p><small>{turn>0?'故事已記下 '+turn+' 次變化':'一切，從一聲問候開始'}</small></div></div>
+  <div className="v3-world-card"><BookOpen size={18}/><div><strong>洛河的世界</strong><p>第 {day} 日 · {location}</p><small>{turn>0?'故事已記下 '+turn+' 次變化':'一切，從一聲問候開始'}</small></div></div>
   <button className="v3-journal-button" onClick={()=>{setJournalOpen(true);setSidebar(false)}} disabled={loading}><BookOpen size={16}/>任務手札 <span>{journal.length}</span></button>
   <details className="v3-time-wait"><summary>在此等待 · 推進時間</summary><p>留在目前位置，讓 NPC 與世界繼續發展。</p><div>{[{minutes:15,label:'15 分鐘'},{minutes:60,label:'1 小時'},{minutes:360,label:'6 小時'},{minutes:1440,label:'1 天'}].map(option=><button key={option.minutes} disabled={busy||loading||!!pending||!!text.trim()} onClick={()=>{setSidebar(false);void send(option.minutes)}}>+ {option.label}</button>)}</div></details>
-  <div className="v3-sidebar-bottom"><p>你可以問候、追問、拒絕，<br/>也可以暫時什麼都不做。</p><button onClick={()=>{setSettings(true);setSidebar(false)}}><Settings2 size={16}/> AI 與閱讀設定</button></div>
+  <div className="v3-sidebar-bottom"><button className="v3-dev-shortcut" disabled={busy||loading||!!pending} onClick={()=>{setDeveloperTab('memory');setDev(true);setSidebar(false)}}><BookOpen size={16}/>開發者 · 世界記憶</button><p>你可以問候、追問、拒絕，<br/>也可以暫時什麼都不做。</p><button onClick={()=>{setSettings(true);setSidebar(false)}}><Settings2 size={16}/> AI 與閱讀設定</button><small className="v3-build-label" title={build?.revision||'本機開發版本'}>{GAME_RELEASE_NAME} · {GAME_RELEASE}<br/>{build?build.release!==GAME_RELEASE?'前後端版本不同，請重新整理':build.revision?build.revision.slice(0,7):'本機開發版':'伺服器版本待確認'}</small></div>
  </aside>
  {sidebar&&<button className="v3-sidebar-scrim" aria-label="收起導航" onClick={()=>setSidebar(false)}/>}
  <div className="v3-workspace">
-  <header className="v3-header"><div className="v3-header-place"><button className="v3-icon v3-menu" aria-label="開啟導航" aria-expanded={sidebar} onClick={()=>setSidebar(!sidebar)}><PanelLeft size={20}/></button><div><span className="v3-kicker">太虛紀事</span><h1>{location}</h1></div></div><div className="v3-header-right"><span className="v3-world-clock">第 {day} 日 <span>·</span> {String(Math.floor(minute/60)).padStart(2,'0')}:{String(minute%60).padStart(2,'0')}</span><button className="v3-connection-button" onClick={()=>setSettings(true)} aria-label="AI 設定"><span className={'v3-status-dot'+(mode!=='demo'&&serverAI?.providers[mode]?.ready?' has-key':'')}/>{mode==='demo'?'示範模式':serverAI?.providers[mode]?.ready?'伺服器 AI':'尚未設定 AI'}<Settings2 size={14}/></button></div></header>
+  <header className="v3-header"><div className="v3-header-place"><button className="v3-icon v3-menu" aria-label="開啟導航" aria-expanded={sidebar} onClick={()=>setSidebar(!sidebar)}><PanelLeft size={20}/></button><div><span className="v3-kicker">太虛紀事</span><h1>{location}</h1></div></div><div className="v3-header-right"><button className="v3-notebook-toggle" onClick={()=>setNotebookOpen(true)} aria-label="查看此刻與人物"><BookOpen size={16}/><span>沿途拾記</span></button><span className="v3-world-clock">第 {day} 日 <span>·</span> {String(Math.floor(minute/60)).padStart(2,'0')}:{String(minute%60).padStart(2,'0')}</span><button className="v3-connection-button" onClick={()=>setSettings(true)} aria-label="AI 設定"><span className={'v3-status-dot'+(mode!=='demo'&&serverAI?.providers[mode]?.ready?' has-key':'')}/>{mode==='demo'?'示範模式':serverAI?.providers[mode]?.ready?'伺服器 AI':'尚未設定 AI'}<Settings2 size={14}/></button></div></header>
   <div className="v3-timeline" ref={timeline} onScroll={()=>{const box=timeline.current;if(box){const isAway=box.scrollHeight-box.scrollTop-box.clientHeight>160;followLatest.current=!isAway;setAway(isAway);}}}>
    <section className="v3-messages" aria-label="故事對話" aria-busy={busy||loading}>
     {loading?<div className="v3-world-loading" role="status"><LoaderCircle size={20}/>正在翻開你的故事……</div>:<>
@@ -258,9 +267,11 @@ export default function V3(){
    {pending&&!busy&&<div className="v3-retry-note"><span>上一回合尚待確認。重試不會重複推進世界。</span><div className="v3-retry-buttons"><button disabled={loading||testing} onClick={()=>void checkPending()}>確認存檔狀態</button><button disabled={loading||testing} onClick={()=>void send()}>重試上一回合</button><button disabled={loading||testing} onClick={()=>void cancelPending()}>取消待確認／修改模型</button></div></div>}
    {mode!=='demo'&&!loading&&!serverAI?.providers[mode]?.ready&&<div className="v3-connect-note"><span>伺服器尚未開啟這個 AI 模型服務。</span><button onClick={()=>setSettings(true)}>查看伺服器模型設定 <ChevronRight size={12}/></button></div>}
    <div className="v3-composer-box"><textarea ref={composer} aria-label="你的對話或行動" value={text} maxLength={2500} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&!window.matchMedia('(pointer: coarse)').matches){e.preventDefault();void send()}}} placeholder="說一句話，或做一件你想做的事…" disabled={busy||loading||!!pending} rows={2}/><div className="v3-composer-bottom"><span>{pending?'確認上一回合後，就能繼續接話':text.length>2000?`${text.length} / 2500`:'你的選擇，由你決定。'}</span><button className="v3-send" aria-label={busy?'等候回覆':'送出對話'} onClick={()=>void send()} disabled={busy||testing||loading||!!pending||!worldId||!text.trim()}>{busy?<LoaderCircle size={19}/>:<ArrowUp size={19}/>}</button></div></div>
-   <div className="v3-composer-hint"><span>{busy?'等待回覆中':pending?'待確認':turn>0?'故事已保存':'自由對話 · 世界會記住你的行動'}</span><span className="v3-keyboard-hint">Enter 送出 · Shift + Enter 換行</span></div>
+   <div className="v3-composer-hint"><span>{busy?'等待回覆中':pending?'待確認':turn>0?'已保存 · 第 '+turn+' 次變化':'自由對話 · 世界會記住你的行動'}</span><span className="v3-keyboard-hint">Enter 送出 · Shift + Enter 換行</span></div>
   </footer>
  </div>
+ <aside className="v3-notebook-rail" aria-label="洛河的手札"><V3WorldPanel memory={memory} profile={profile} location={location} revision={turn}/></aside>
+ <dialog ref={notebookDialog} className="v3-dialog" onCancel={()=>setNotebookOpen(false)}><div className="v3-dialog-inner"><header className="v3-dialog-header"><span className="v3-kicker">洛河的手札</span><button className="v3-icon" aria-label="關閉沿途拾記" onClick={()=>setNotebookOpen(false)}><X size={20}/></button></header><V3WorldPanel memory={memory} profile={profile} location={location} revision={turn}/></div></dialog>
  <dialog ref={settingsDialog} className="v3-dialog" onCancel={()=>setSettings(false)} onClick={e=>{if(e.target===e.currentTarget)setSettings(false)}}><div className="v3-dialog-inner"><header className="v3-dialog-header"><div><span className="v3-kicker">讓故事繼續</span><h2>AI 設定</h2></div><button className="v3-icon" aria-label="關閉 AI 設定" onClick={()=>setSettings(false)}><X size={20}/></button></header>
  <section className="v3-panel"><fieldset disabled={loading||busy||testing||!!pending}><legend>選擇對話模式</legend><div className="v3-provider-grid">{([['openrouter','免費 AI','OpenRouter'],['demo','先試試介面','示範模式，非 AI'],['ai','OpenAI','依 API 用量計費']] as [Mode,string,string][]).map(([value,label,description])=><label className={'v3-provider'+(mode===value?' selected':'')} key={value}><input type="radio" checked={mode===value} onChange={()=>selectMode(value)}/><span><strong>{label}</strong><small>{description}</small></span></label>)}</div>
  {mode!=='demo'&&<label className="v3-field">模型 ID<select value={model} onChange={e=>{setModel(e.target.value);setConnection('');localStorage.setItem(preferencesKey,JSON.stringify({mode,model:e.target.value}))}}>{[...new Set([model,...(serverAI?.providers[mode]?.models||[])])].map(id=><option key={id} value={id}>{id}</option>)}</select></label>}</fieldset>
@@ -275,7 +286,7 @@ export default function V3(){
  <details className="v3-advanced"><summary>進階與人物檔案</summary><p>已選模型：{model}{usedModel?' · 上回合實際使用：'+usedModel:''}{usage!==null?' · 上回合 '+usage+' tokens':''}</p><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('people');setDev(true)}}><BookOpen size={15}/>開發者人物檔案</button><button disabled={busy||!!pending} onClick={()=>{setSettings(false);setDeveloperTab('tasks');setDev(true)}}><BookOpen size={15}/>開發者任務管理</button><p>只有已登入且擁有這個世界線的帳號可以查看或編輯這份後台資料。</p><button type="button" disabled={busy||loading||!!pending} className="v3-danger-button" onClick={()=>void clearHistory()}>永久清除我所有 V3 世界線及對話紀錄</button></details>
  <button className="v3-done-button" onClick={()=>setSettings(false)}>{mode==='demo'?'開始試玩':'回到故事'}<ChevronRight size={16}/></button>
  </section></div></dialog>
- <dialog ref={developerDialog} className="v3-dialog v3-inspector" onCancel={()=>setDev(false)}><div className="v3-dialog-inner"><header className="v3-dialog-header"><h2>{developerTab==='tasks'?'任務管理':'人物檔案'}</h2><button className="v3-icon" aria-label="關閉開發者後台" onClick={()=>setDev(false)}><X size={20}/></button></header><nav className="v3-developer-tabs" aria-label="開發者後台"><button aria-pressed={developerTab==='people'} onClick={()=>setDeveloperTab('people')}>人物管理</button><button aria-pressed={developerTab==='tasks'} onClick={()=>setDeveloperTab('tasks')}>任務管理</button></nav>{dev&&worldId&&!pending&&(developerTab==='people'?<V3DeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/>:<V3TaskDeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/>)}</div></dialog>
+ <dialog ref={developerDialog} className="v3-dialog v3-inspector" onCancel={()=>setDev(false)}><div className="v3-dialog-inner"><header className="v3-dialog-header"><h2>{developerTab==='tasks'?'任務管理':developerTab==='memory'?'世界記憶':'人物檔案'}</h2><button className="v3-icon" aria-label="關閉開發者後台" onClick={()=>setDev(false)}><X size={20}/></button></header><nav className="v3-developer-tabs" aria-label="開發者後台"><button aria-pressed={developerTab==='memory'} onClick={()=>setDeveloperTab('memory')}>記憶與歷史</button><button aria-pressed={developerTab==='people'} onClick={()=>setDeveloperTab('people')}>人物管理</button><button aria-pressed={developerTab==='tasks'} onClick={()=>setDeveloperTab('tasks')}>任務管理</button></nav>{dev&&worldId&&!pending&&(developerTab==='memory'?<V3MemoryInspector key={worldId} worldId={worldId} revision={turn} onWorldChange={applyWorld}/>:developerTab==='people'?<V3DeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/>:<V3TaskDeveloperPanel worldId={worldId} revision={turn} onWorldChange={applyWorld}/>)}</div></dialog>
  <dialog ref={journalDialog} className="v3-dialog" onCancel={()=>setJournalOpen(false)}><div className="v3-dialog-inner"><header className="v3-dialog-header"><div><span className="v3-kicker">洛河已知的事情</span><h2>經歷與任務手札</h2></div><button className="v3-icon" aria-label="關閉任務手札" onClick={()=>setJournalOpen(false)}><X size={20}/></button></header><p className="v3-journal-note">只顯示洛河已知的線索。任務可以忽略、拒絕或走向不同結局。</p>{journal.length===0?<p>重要經歷會記在這裡，你可以自由生活與探索。</p>:journal.map(quest=><article className="v3-journal-entry" key={quest.id}><div><span>{quest.type}</span><span>{quest.status}</span></div><h3>{quest.title}</h3><p>{quest.description}</p>{quest.type!=='經歷'&&<progress aria-label={quest.title+'進度'} max={100} value={quest.progress}/>}<p>{quest.objective}</p></article>)}</div></dialog>
  </main>
 }
