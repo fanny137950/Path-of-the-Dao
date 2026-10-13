@@ -79,7 +79,24 @@ jobs:
           set -euo pipefail
           STATUS=$(curl -sS -L -o /dev/null -w '%{http_code}' --max-time 30             https://wendao-living-world.danew137950.workers.dev/)
           [[ "$STATUS" == '200' ]] || { echo "Site returned HTTP $STATUS"; exit 1; }
-          curl --fail --silent --show-error --max-time 30 \
-            https://wendao-living-world.danew137950.workers.dev/api/v3/version \
-            | jq -e --arg sha "$GITHUB_SHA" '.revision == $sha and .release == "memory-1"'
+          # The Workers edge can serve a previous or not-yet-routed version
+          # immediately after deploy. Retry briefly; never silently accept 404
+          # or a build revision mismatch.
+          VERSION_URL="https://wendao-living-world.danew137950.workers.dev/api/v3/version"
+          verified=0
+          for attempt in $(seq 1 12); do
+            tmp=$(mktemp)
+            status=$(curl --silent --show-error --max-time 15 \
+              -o "$tmp" -w '%{http_code}' "$VERSION_URL") || status=000
+            if [[ "$status" == 200 ]] && jq -e --arg sha "$GITHUB_SHA" \
+              '.revision == $sha and .release == "memory-1"' "$tmp" >/dev/null 2>&1; then
+              verified=1
+              rm -f "$tmp"
+              break
+            fi
+            echo "Version probe $attempt/12: HTTP $status; expected current revision. Retrying..."
+            rm -f "$tmp"
+            [[ "$attempt" == 12 ]] || sleep 5
+          done
+          [[ "$verified" == 1 ]] || { echo 'Deployed root is healthy but version endpoint did not confirm this build'; exit 1; }
           echo 'Deployed V3 site and build revision verified.'
