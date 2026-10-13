@@ -7,7 +7,7 @@ type Schedule={id:string;name:string;type:string;location:string;start:number;en
  stages:Stage[];source?:string;origin?:string;templateId?:string;cycle?:number;repeatYears?:number;description?:string;cancelledAt?:number};
 type Arc={id:string;name:string;truth:string;status:string;participants:string[];
  beats:{id:string;at:number;summary:string;witnesses:string[]}[];completed:string[]};
-type DeveloperData={world:string;revision:number;day:number;minute:number;
+type DeveloperData={gmManaged?:boolean;world:string;revision:number;day:number;minute:number;
  eventCalendar:{epoch:string;events:Schedule[]};livingArcs:Arc[];
  eventTemplates?:{id:string;name:string;intervalYears:number;note:string}[];gameYearDays?:number;
  characters:Record<string,{name:string}>;error?:string};
@@ -48,7 +48,7 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
  const events=data?.eventCalendar.events||[];
  const all=useMemo(()=>[
   ...events.map(e=>({...e,kind:'scheduled' as const})),
-  ...(data?.livingArcs||[]).map(a=>({
+  ...(data?.gmManaged?[]:data?.livingArcs||[]).map(a=>({
    id:a.id,name:a.name,type:'幕後事件',location:'幕後',start:a.beats[0]?.at??0,end:a.beats.at(-1)?.at??0,
    participants:a.participants,public:false,state:a.status,completed:a.completed,
    stages:a.beats.map(b=>({id:b.id,at:b.at,title:b.summary,detail:'知情者：'+b.witnesses.map(id=>data?.characters[id]?.name||id).join('、')})),
@@ -99,14 +99,14 @@ export default function V3TaskDeveloperPanel({worldId,revision,onWorldChange}:{
  }
  return <section className="v3-panel v3-dev-panel v3-task-admin" aria-label="開發者任務管理">
   <h3>開發者管理 · 任務與世界事件</h3>
-  <p>這裡可以檢視正式活動、幕後事件、每個時間節點與參與角色；隱藏資訊不會送往玩家畫面。時間以遊戲世界為準。</p>
+  <p>這裡保存既有世界日程與開發者排程。AI GM 建立的事件進度、幕後真相與來源請到「記憶與歷史」查看；排程日期本身不代表事件結果已經發生。</p>
   {loading&&<p>正在讀取事件與世界日程……</p>}
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {notice&&<p className="v3-success">{notice}</p>}
   {data&&<>
    <div className="v3-dev-dossier v3-task-templates">
     <strong>世界預設週期活動（{data.eventTemplates?.length??0} 類）</strong>
-    <p>遊戲年暫訂 {data.gameYearDays??365} 日。收徒三年一次；論道、出峰歷練每年有固定活動窗口。玩家不參加也不會停止日程。</p>
+    <p>遊戲年暫訂 {data.gameYearDays??365} 日。收徒三年一次；論道、出峰歷練每年有固定活動窗口。GM 會參考這些時間推演後續，不會由日程自動判定結局。</p>
     {data.eventTemplates?.map(template=><p key={template.id}><strong>{template.name}</strong> · 每 {template.intervalYears} 年一次 · {template.note}</p>)}
    </div>
    <div className="v3-task-overview">

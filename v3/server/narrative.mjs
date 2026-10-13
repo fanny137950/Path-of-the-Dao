@@ -33,6 +33,6 @@ export function requireNarrative(raw){
 /** Validate optional chat roles at the provider boundary. No tools or system roles. */
 export function validConversation(messages){
  return Array.isArray(messages)&&messages.length>0&&messages.length<=17&&
-  messages.at(-1)?.role==='user'&&messages.every(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'&&m.content.length<=9000)&&
-  messages.reduce((n,m)=>n+m.content.length,0)<=10000;
+  messages.at(-1)?.role==='user'&&messages.every(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'&&m.content.length<=12000)&&
+  messages.reduce((n,m)=>n+m.content.length,0)<=18000;
 }

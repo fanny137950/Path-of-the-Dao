@@ -65,3 +65,17 @@ export function registerNamedNPCs(world,narrative,proposals=[],seenIds=[]){
   (String(narrative).includes(n.name)||seenIds.includes(n.id))).map(n=>n.id);
  return {created,mentioned:mentions};
 }
+
+/** New arrivals do not know their server-assigned ID until the next turn. */
+export function resolveNPCReferences(world,refs){
+ if(!Array.isArray(refs)||refs.length>12)return null;
+ const out=[];
+ for(const ref of refs){
+  if(typeof ref!=='string')return null;
+  if(Object.hasOwn(world.npcs,ref)){out.push(ref);continue;}
+  const matches=Object.values(world.npcs).filter(n=>n.name===ref);
+  if(matches.length!==1)return null;
+  out.push(matches[0].id);
+ }
+ return [...new Set(out)];
+}

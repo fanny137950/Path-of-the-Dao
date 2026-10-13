@@ -1,3 +1,4 @@
+import {applyMemorySystem,playerMemory,memoryState,stateChanges} from './memory-system.mjs';
 import {roleplayContext} from './roleplay-context.mjs';
 import {isNonNarrative,requireNarrative,visibleNarrative} from './narrative.mjs';
 import {initialScene,sceneOf,updateScene,sceneContext} from './scene-context.mjs';
@@ -99,7 +100,7 @@ export function validatedWorld(value){
 }
 export function playerWorld(world){
  return {id:world.id,revision:world.revision,day:world.day,minute:world.minute,
- location:world.location,protagonist:world.protagonist,
+ location:world.location,protagonist:world.protagonist,memory:playerMemory(world),
   // Keep old D1 event history untouched, but do not render legacy classifier
   // outputs as if they were a character's dialogue.
   messages:world.messages.map(m=>m.role==='assistant'
@@ -113,6 +114,7 @@ export function developerWorld(world){
   location:world.location,bibleVersion:WORLD_BIBLE_VERSION,
   gmManaged:world.gmManaged===true,
   gmMemories:clone(world.gmMemories||[]),
+  memorySystem:clone(memoryState(world)),
   worldBible:clone(WORLD_BIBLE),protagonist:clone(world.protagonist),
   characters:clone(world.npcs),events:clone(world.events.slice(-25)),
   npcAgency:clone(ensureNPCAgency(world)),
@@ -142,8 +144,8 @@ export function recalledMemories(actor,query,limit=8){
   m,score:[...terms(m.text||'')].filter(k=>keys.has(k)).length*8+(m.importance||1)*2+i/Math.max(1,mem.length)
  })).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.m);
 }
-export function gmContext(world,userText,{includeDialogue=true}={}){
- if(world.gmManaged)return roleplayContext(world,userText);
+export function gmContext(world,userText,{includeDialogue=true,advanceMinutes=0}={}){
+ if(world.gmManaged)return roleplayContext(world,userText,{advanceMinutes});
  const badEvents=new Set(world.events.filter(e=>isNonNarrative(e.reply)).map(e=>e.id));
  const present=nearbyCharacters(world);
  const people=present.map(actor=>{
@@ -206,10 +208,12 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,6500})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[],memories:[],offscreenChanges:[],elapsedMinutes:null,protagonist:null};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[],memories:[],offscreenChanges:[],elapsedMinutes:null,protagonist:null,workingMemory:null,threads:[]};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[],memories=[],offscreenChanges=[],elapsedMinutes=null,protagonist=null;
+ let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[],memories=[],offscreenChanges=[],elapsedMinutes=null,protagonist=null,workingMemory=null,threads=[];
  try{const parsed=JSON.parse(match[1]);suggestions=validateSuggestions(parsed.suggestions,narration);
+  if(parsed.workingMemory&&typeof parsed.workingMemory==='object')workingMemory=parsed.workingMemory;
+  if(Array.isArray(parsed.threads))threads=parsed.threads.slice(0,6);
   if(parsed.protagonist&&typeof parsed.protagonist==='object'&&!Array.isArray(parsed.protagonist))protagonist=parsed.protagonist;
   if(Array.isArray(parsed.memories))memories=parsed.memories.slice(0,6);
   if(Array.isArray(parsed.offscreenChanges))offscreenChanges=parsed.offscreenChanges.slice(0,6);
@@ -219,7 +223,7 @@ export function parseGMResult(raw){
   if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);
   if(Array.isArray(parsed.taskUpdates))taskUpdates=parsed.taskUpdates.slice(0,5);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions,memories,offscreenChanges,elapsedMinutes,protagonist};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions,memories,offscreenChanges,elapsedMinutes,protagonist,workingMemory,threads};
 }
 function applyProtagonist(world,patch,narration){
  if(!patch||typeof patch.evidence!=='string'||patch.evidence.length<4||patch.evidence.length>200||!narration.includes(patch.evidence))return;
@@ -321,7 +325,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
   ...(requestedMinutes?{advanceMinutes:requestedMinutes}:{}),
   ...(options.sceneJump?{sceneJump:options.sceneJump}:{}),
   root:root||null,destination:approvedMove?move.to:null,witnesses:seenBy});
- for(const id of seenBy){
+ for(const id of world.gmManaged?[]:seenBy){
   const actor=next.npcs[id];
   actor.knowledge.push(eventId);
   actor.memories.push({id:eventId+':'+id,eventId,kind:'親歷',day:next.day,minute:next.minute,
@@ -339,6 +343,11 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  updateDurableMemory(next,next.events.find(e=>e.id===eventId));
  if(world.gmManaged){
   recordGMMemories(next,parsed.memories,parsed.offscreenChanges,parsed.narration);
+  const committed=next.events.find(e=>e.id===eventId);
+  applyMemorySystem(next,parsed,parsed.narration,committed);
+  committed.rawAnswer=rawAnswer;
+  committed.changes=stateChanges(world,next);
+  committed.records={workingMemory:clone(next.memorySystem.working),threads:clone(next.memorySystem.threads.filter(t=>t.revision===next.revision)),memoryIds:next.gmMemories.filter(m=>m.revision===next.revision).map(m=>m.id)};
  }else{
   advanceLivingWorld(next,before,after);
   advanceNPCAgency(next,before,after);

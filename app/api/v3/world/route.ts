@@ -1,3 +1,5 @@
+// @ts-ignore - append-only memory history
+import {historyArchive,correctMemory,serializeWorldSave} from '../../../../v3/server/memory-system.mjs';
 // @ts-ignore - bounded original conversation roles
 import {providerConversation} from '../../../../v3/server/conversation-memory.mjs';
 import {env} from 'cloudflare:workers';
@@ -41,7 +43,15 @@ export async function GET(request:Request){
   if(!/^[0-9a-f-]{36}$/.test(id))return reply({error:'無效世界 ID'},400);
   const world=await readWorld(id,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
-  if(new URL(request.url).searchParams.get('view')==='developer'){
+  const view=new URL(request.url).searchParams.get('view');
+  if(view==='history'){
+   const params=new URL(request.url).searchParams;
+   const before=Number(params.get('before'))||Infinity;
+   const entries=historyArchive(world,params.get('q')||'',before);
+   return reply({entries,nextBefore:entries.length===25?entries.at(-1)?.revision:null});
+  }
+  if(view==='export')return new Response(JSON.stringify({format:'wendao-save-v1',exportedAt:new Date().toISOString(),world}),{headers:{'Content-Type':'application/json','Cache-Control':'no-store','Content-Disposition':'attachment; filename="wendao-save.json"'}});
+  if(view==='developer'){
    return reply(developerWorld(world));
   }
   const requestId=new URL(request.url).searchParams.get('requestId');
@@ -70,16 +80,26 @@ export async function POST(request:Request){
     .bind(id,user.userId,'問道九州 V3 · 洛河',0,JSON.stringify(world),new Date().toISOString()).run();
    return reply(playerWorld(world),201);
   }
-  if(!['turn','advance-time','edit-character','manage-task'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
+  if(!['turn','advance-time','edit-character','manage-task','edit-memory'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
   const world=await readWorld(body.world,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
+  if(body.op==='edit-memory'){
+   if(body.revision!==world.revision)return reply({error:'世界已更新，請重新讀取記憶'},409);
+   let next;
+   try{next=correctMemory(world,body.target,body.patch,body.note,user.userId);}
+   catch(e){return reply({error:e instanceof Error?e.message:'記憶修正無效'},400);}
+   const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
+    .bind(serializeWorldSave(next),next.revision,world.id,user.userId,world.revision).run();
+   if(result.meta.changes!==1)return reply({error:'世界已更新，請重新讀取記憶'},409);
+   return reply({world:playerWorld(next)});
+  }
   if(body.op==='edit-character'){
    if(body.revision!==world.revision)return reply({error:'世界版本已更新，請重新讀取人物資料'},409);
    let next;
    try{next=editCharacter(world,body.actor,body.patch,body.note,user.userId);}
    catch(e){return reply({error:e instanceof Error?e.message:'人物設定無效'},400);}
    const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
-    .bind(JSON.stringify(next),next.revision,world.id,user.userId,world.revision).run();
+    .bind(serializeWorldSave(next),next.revision,world.id,user.userId,world.revision).run();
    if(result.meta.changes!==1)return reply({error:'世界資料已更新，請重試'},409);
    return reply({world:playerWorld(next),developer:developerWorld(next)});
   }
@@ -89,7 +109,7 @@ export async function POST(request:Request){
    try{next=developerTaskChange(world,body.action,body.task,user.userId);}
    catch(e){return reply({error:e instanceof Error?e.message:'任務資料無效'},400);}
    const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
-    .bind(JSON.stringify(next),next.revision,world.id,user.userId,world.revision).run();
+    .bind(serializeWorldSave(next),next.revision,world.id,user.userId,world.revision).run();
    if(result.meta.changes!==1)return reply({error:'世界資料已更新，請重試'},409);
    return reply({world:playerWorld(next),developer:developerWorld(next)});
   }
@@ -123,7 +143,7 @@ export async function POST(request:Request){
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
     :'';
-   const args={apiKey:selected!.apiKey,instructions:GM_INSTRUCTIONS+timeDirective,conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false}),maxOutputTokens:4000};
+   const args={apiKey:selected!.apiKey,instructions:GM_INSTRUCTIONS+timeDirective,conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false,advanceMinutes:isTimeAdvance?requestedMinutes:0}),maxOutputTokens:4000};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
@@ -137,7 +157,7 @@ export async function POST(request:Request){
   committed.request=identity;
   // Compare-and-swap: no partial turn or lost concurrent update.
   const result=await requireDB().prepare('UPDATE worlds SET state=?, revision=? WHERE id=? AND owner=? AND revision=?')
-   .bind(JSON.stringify(next),next.revision,world.id,user.userId,world.revision).run();
+   .bind(serializeWorldSave(next),next.revision,world.id,user.userId,world.revision).run();
   if(result.meta.changes!==1){
    const current=await readWorld(world.id,user.userId);
    if(current&&checkTurnRequest(current,body.requestId,identity).replayed)return reply({...playerWorld(current),usage:null});

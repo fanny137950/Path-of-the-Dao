@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test V3 OpenAI adapter
+      - name: Test V3 game and memory
         run: node --test v3/tests/*.test.mjs
 
       - name: Typecheck
@@ -79,4 +79,7 @@ jobs:
           set -euo pipefail
           STATUS=$(curl -sS -L -o /dev/null -w '%{http_code}' --max-time 30             https://wendao-living-world.danew137950.workers.dev/)
           [[ "$STATUS" == '200' ]] || { echo "Site returned HTTP $STATUS"; exit 1; }
-          echo 'Deployed V3 site is responding.'
+          curl --fail --silent --show-error --max-time 30 \
+            https://wendao-living-world.danew137950.workers.dev/api/v3/version \
+            | jq -e --arg sha "$GITHUB_SHA" '.revision == $sha and .release == "memory-1"'
+          echo 'Deployed V3 site and build revision verified.'

@@ -3,6 +3,7 @@
  * The ledger stores source excerpts, not AI-invented summaries. It distinguishes
  * what the GM can verify from what each NPC actually witnessed.
  */
+import {resolveNPCReferences} from './npc-registration.mjs';
 import {visibleNarrative,isNonNarrative} from './narrative.mjs';
 const excerpt=(s,n)=>String(s??'').trim().slice(0,n);
 const categories=[
@@ -83,19 +84,22 @@ export function recordGMMemories(world,records,offscreenChanges,narration){
  world.gmMemories??=[];
  const accepted=new Map();
  for(const [index,item] of (Array.isArray(records)?records.slice(0,6):[]).entries()){
-  if(!item||typeof item.text!=='string'||!item.text.trim()||item.text.length>500||
-     typeof item.playerKnown!=='boolean'||!Array.isArray(item.knownBy)||item.knownBy.length>12||
-     item.knownBy.some(id=>typeof id!=='string'||!Object.hasOwn(world.npcs,id)))continue;
+  const knownBy=resolveNPCReferences(world,item?.knownBy);
+  if(!item||!knownBy||typeof item.text!=='string'||!item.text.trim()||item.text.length>500||
+     typeof item.playerKnown!=='boolean')continue;
   if(item.playerKnown&&(typeof item.evidence!=='string'||item.evidence.length<4||item.evidence.length>200||!narration.includes(item.evidence)))continue;
+  const superseded=typeof item.supersedes==='string'?world.gmMemories.find(m=>m.id===item.supersedes):null;
+  // A corrected belief/promise only replaces the same group's knowledge.
+  if(item.supersedes&&(!superseded||JSON.stringify([...new Set(superseded.knownBy)].sort())!==JSON.stringify([...knownBy].sort())))continue;
   const memory={id:'gm-memory:'+world.revision+':'+index,revision:world.revision,
-   day:world.day,minute:world.minute,text:item.text.trim(),knownBy:[...new Set(item.knownBy)],
-   playerKnown:item.playerKnown,...(item.playerKnown?{evidence:item.evidence}:{})};
+   day:world.day,minute:world.minute,text:item.text.trim(),knownBy:[...knownBy],
+   playerKnown:item.playerKnown,...(superseded?{supersedes:superseded.id}:{}),kind:['fact','belief','promise','relationship'].includes(item.kind)?item.kind:'fact',interpretation:excerpt(item.interpretation,220),emotion:excerpt(item.emotion,80),resolved:item.resolved===true,...(item.playerKnown?{evidence:item.evidence}:{})};
   world.gmMemories.push(memory);accepted.set(index,memory);
   for(const id of memory.knownBy){
    const npc=world.npcs[id];
    npc.knowledge.push(memory.id);
-   npc.memories.push({id:memory.id+':'+id,eventId:memory.id,kind:'知悉',day:world.day,minute:world.minute,
-    importance:2,source:'GM事件紀錄',text:memory.text});
+   npc.memories.push({id:memory.id+':'+id,eventId:memory.id,day:world.day,minute:world.minute,
+    importance:memory.kind==='promise'&&!memory.resolved?3:2,source:'GM事件紀錄',text:memory.text,kind:memory.kind,interpretation:memory.interpretation,emotion:memory.emotion,resolved:memory.resolved,supersedes:memory.supersedes,knownBy:memory.knownBy,playerKnown:memory.playerKnown});
   }
  }
  for(const change of Array.isArray(offscreenChanges)?offscreenChanges.slice(0,6):[]){
@@ -107,10 +111,15 @@ export function recordGMMemories(world,records,offscreenChanges,narration){
   if(Number.isInteger(change.cultivationProgress)&&change.cultivationProgress>=0&&change.cultivationProgress<=100)npc.cultivationProgress=change.cultivationProgress;
  }
 }
+export function currentGMMemories(world,{publicOnly=false}={}){
+ const entries=(world.gmMemories||[]).filter(m=>!publicOnly||m.playerKnown);
+ const replaced=new Set(entries.map(m=>m.supersedes).filter(Boolean));
+ return entries.filter(m=>!replaced.has(m.id));
+}
 export function gmNotebookContext(world,query){
- const entries=world.gmMemories||[];
+ const entries=currentGMMemories(world);
  const ranked=entries.map((m,i)=>({m,score:overlap(query,m.text)*4+i/Math.max(1,entries.length)}))
   .sort((a,b)=>b.score-a.score).slice(0,6).sort((a,b)=>a.m.revision-b.m.revision);
  return '【GM事件記憶：知情範圍不可擴散】\n'+ranked.map(({m})=>
-  '第'+m.day+'日：'+m.text+'【'+(m.playerKnown?'洛河可知':'洛河未知')+'；知情者：'+m.knownBy.map(id=>world.npcs[id]?.name||id).join('、')+'】').join('\n').slice(0,1400);
+  '['+m.id+']第'+m.day+'日（'+(m.kind||'fact')+(m.resolved?'，已了結':'')+'）：'+m.text+(m.interpretation?'；角色理解：'+m.interpretation:'')+'【'+(m.playerKnown?'洛河可知':'洛河未知')+'；知情者：'+m.knownBy.map(id=>world.npcs[id]?.name||id).join('、')+'】').join('\n').slice(0,1400);
 }
