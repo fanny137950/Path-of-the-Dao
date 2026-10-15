@@ -1,3 +1,4 @@
+import {validDecision,currentDecision,validateFastForwardResult} from './fast-forward.mjs';
 import {applyMemorySystem,playerMemory,memoryState,stateChanges} from './memory-system.mjs';
 import {roleplayContext} from './roleplay-context.mjs';
 import {isNonNarrative,requireNarrative,visibleNarrative} from './narrative.mjs';
@@ -107,7 +108,7 @@ export function playerWorld(world){
    ?{...m,content:isNonNarrative(m.content)
       ?'（先前免費模型的回應無效，已排除在遊戲劇情之外。）'
       :visibleNarrative(m.content)}:m),
-  phase:'freeform',choices:[],suggestions:suggestedActions(world),journal:playerQuestJournal(world)};
+  phase:'freeform',choices:[],decision:currentDecision(world),suggestions:suggestedActions(world),journal:playerQuestJournal(world)};
 }
 export function developerWorld(world){
  return {world:world.id,revision:world.revision,day:world.day,minute:world.minute,
@@ -208,10 +209,10 @@ const marker=/\n?<!--GM_STATE:([\s\S]{1,6500})-->\s*$/;
 export function parseGMResult(raw){
  if(typeof raw!=='string'||!raw.trim())throw Error('GM 回覆無效');
  const match=raw.match(marker);
- if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[],memories:[],offscreenChanges:[],elapsedMinutes:null,protagonist:null,workingMemory:null,threads:[]};
+ if(!match)return {narration:visibleNarrative(raw),changes:[],move:null,schedules:[],newNPCs:[],taskUpdates:[],suggestions:[],memories:[],offscreenChanges:[],elapsedMinutes:null,protagonist:null,workingMemory:null,threads:[],decision:null,decisionReported:false};
  const narration=raw.slice(0,match.index).trim();
- let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[],memories=[],offscreenChanges=[],elapsedMinutes=null,protagonist=null,workingMemory=null,threads=[];
- try{const parsed=JSON.parse(match[1]);suggestions=validateSuggestions(parsed.suggestions,narration);
+ let changes=[],move=null,schedules=[],newNPCs=[],taskUpdates=[],suggestions=[],memories=[],offscreenChanges=[],elapsedMinutes=null,protagonist=null,workingMemory=null,threads=[],decision=null,decisionReported=false;
+ try{const parsed=JSON.parse(match[1]);decision=validDecision(parsed.decision,narration);decisionReported=parsed.decision===null||!!decision;suggestions=validateSuggestions(parsed.suggestions,narration);
   if(parsed.workingMemory&&typeof parsed.workingMemory==='object')workingMemory=parsed.workingMemory;
   if(Array.isArray(parsed.threads))threads=parsed.threads.slice(0,6);
   if(parsed.protagonist&&typeof parsed.protagonist==='object'&&!Array.isArray(parsed.protagonist))protagonist=parsed.protagonist;
@@ -223,7 +224,7 @@ export function parseGMResult(raw){
   if(Array.isArray(parsed.newNPCs))newNPCs=parsed.newNPCs.slice(0,3);
   if(Array.isArray(parsed.taskUpdates))taskUpdates=parsed.taskUpdates.slice(0,5);}
  catch{/* Invalid metadata never changes canonical state. */}
- return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions,memories,offscreenChanges,elapsedMinutes,protagonist,workingMemory,threads};
+ return {narration:narration||'（本回合未產生可用敘述，請重試。）',changes,move,schedules,newNPCs,taskUpdates,suggestions,memories,offscreenChanges,elapsedMinutes,protagonist,workingMemory,threads,decision,decisionReported};
 }
 function applyProtagonist(world,patch,narration){
  if(!patch||typeof patch.evidence!=='string'||patch.evidence.length<4||patch.evidence.length>200||!narration.includes(patch.evidence))return;
@@ -297,6 +298,7 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  if(world.events.filter(e=>e.type==='conversation').length>=1000)throw Error('試玩世界已達1000回合，請先備份');
  const before=elapsedMinutes(world);
  const present=new Set(presentIds(world)),parsed=parseGMResult(rawAnswer),next=clone(world);
+ if(options.fastForward)validateFastForwardResult(world,parsed,options.fastForward);
  const move=parsed.move;
  const approvedMove=move&&typeof move.to==='string'&&move.to.trim()&&move.to.length<=80&&(world.gmManaged||LOCATIONS.includes(move.to))&&move.to!==world.location&&
   (world.gmManaged||userText.includes(move.to)||/(前往|走向|跟著|隨同|出發|帶我去)/.test(userText))&&
@@ -319,11 +321,12 @@ export function commitV3Turn(world,userText,rawAnswer,requestId,options={}){
  const eventId='turn:'+next.revision;
  const registration=registerNamedNPCs(next,parsed.narration,parsed.newNPCs);
  const seenBy=privacyHint(userText)?[]:[...new Set([...present,...registration.mentioned])];
- next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration,suggestions:parsed.suggestions});
+ next.messages.push({role:'user',content:userText},{role:'assistant',content:parsed.narration,suggestions:parsed.suggestions,decision:parsed.decision,...(options.fastForward?{fastForward:{...options.fastForward,elapsedMinutes:delta,stoppedForDecision:!!parsed.decision}}:{})});
  next.events.push({requestId,id:eventId,revision:next.revision,day:next.day,minute:next.minute,
   type:'conversation',text:userText,reply:parsed.narration,location:world.location,
   ...(requestedMinutes?{advanceMinutes:requestedMinutes}:{}),
   ...(options.sceneJump?{sceneJump:options.sceneJump}:{}),
+  ...(options.fastForward?{fastForward:{...options.fastForward,elapsedMinutes:delta,stoppedForDecision:!!parsed.decision}}:{}),
   root:root||null,destination:approvedMove?move.to:null,witnesses:seenBy});
  for(const id of world.gmManaged?[]:seenBy){
   const actor=next.npcs[id];

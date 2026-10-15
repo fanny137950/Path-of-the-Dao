@@ -39,6 +39,8 @@
 
 ## 部署與辨識
 
+以下記錄 memory-1 初版；後續快進與選擇版本請依 [V3-FAST-FORWARD.md](V3-FAST-FORWARD.md) 部署及辨識。
+
 1. 將 `codex/layered-memory-playable` 合併到 `codex/ensemble-story-deployment`。不要合併舊的 `codex/v3-reliable-api`。
 2. GitHub Actions → **Deploy V3 to Cloudflare** → **Run workflow**，選 `codex/ensemble-story-deployment`，確認文字輸入 `wendao-living-world`。
 3. 完成後開啟 `/v3`。側欄應顯示「記憶與世界 · memory-1」及部署 commit 的前 7 碼。

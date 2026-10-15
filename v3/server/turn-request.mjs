@@ -1,7 +1,8 @@
 // Request identity only. Narrative/world decisions remain in the existing GM path.
 export function turnIdentity(body,text){
  return {text,op:body.op,advanceMinutes:body.op==='advance-time'?body.advanceMinutes:null,
-  mode:body.mode,model:body.model||'',revision:body.revision};
+  mode:body.mode,model:body.model||'',revision:body.revision,
+  ...(body.op==='fast-forward'?{limitMinutes:body.limitMinutes,target:(body.target||'').trim()}:{})};
 }
 export function checkTurnRequest(world,requestId,identity){
  const prior=world.events.find(event=>event.requestId===requestId);

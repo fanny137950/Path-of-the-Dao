@@ -83,13 +83,14 @@ jobs:
           # immediately after deploy. Retry briefly; never silently accept 404
           # or a build revision mismatch.
           VERSION_URL="https://wendao-living-world.danew137950.workers.dev/api/v3/version"
+          EXPECTED_RELEASE=$(node --input-type=module -e "import {GAME_RELEASE} from './v3/release.mjs'; process.stdout.write(GAME_RELEASE)")
           verified=0
           for attempt in $(seq 1 12); do
             tmp=$(mktemp)
             status=$(curl --silent --show-error --max-time 15 \
               -o "$tmp" -w '%{http_code}' "$VERSION_URL") || status=000
-            if [[ "$status" == 200 ]] && jq -e --arg sha "$GITHUB_SHA" \
-              '.revision == $sha and .release == "memory-1"' "$tmp" >/dev/null 2>&1; then
+            if [[ "$status" == 200 ]] && jq -e --arg sha "$GITHUB_SHA" --arg release "$EXPECTED_RELEASE" \
+              '.revision == $sha and .release == $release' "$tmp" >/dev/null 2>&1; then
               verified=1
               rm -f "$tmp"
               break
