@@ -1,25 +1,30 @@
 'use client';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {ArrowUp,ArrowDown,Plus,Settings2,PanelLeft,BookOpen,Sparkles,X,Copy,Check,LoaderCircle,ChevronRight} from 'lucide-react';
+import {ArrowUp,ArrowDown,Plus,Settings2,PanelLeft,BookOpen,Sparkles,X,Copy,Check,LoaderCircle,ChevronRight,FastForward,Play,Pencil} from 'lucide-react';
 import V3WorldPanel,{type PlayerMemory,type PlayerProfile} from '../../components/v3-world-panel';
 import V3MemoryInspector from '../../components/v3-memory-inspector';
 import {GAME_RELEASE,GAME_RELEASE_NAME} from '../../v3/release.mjs';
+import {FAST_FORWARD_LIMITS,fastForwardText} from '../../v3/server/fast-forward.mjs';
 import StoryText from '../../components/v3-story-text';
 import './v3.css';
 import V3TaskDeveloperPanel from '../../components/v3-task-developer-panel';
 import V3DeveloperPanel from '../../components/v3-developer-panel';
-type Msg={role:'user'|'assistant';content:string};
+type FastForward={limitMinutes:number;target:string};
+type Decision={question:string;evidence:string};
+type Msg={role:'user'|'assistant';content:string;fastForward?:FastForward&{elapsedMinutes:number;stoppedForDecision:boolean}};
 type Mode='demo'|'ai'|'openrouter';
 type Suggestion={label:string;text:string;kind?:'action'|'advance'};
 type Quest={id:string;title:string;type:string;status:string;description:string;objective:string;progress:number;updatedDay:number};
-type WorldView={memory?:PlayerMemory;protagonist?:PlayerProfile;journal?:Quest[];confirmedRequestId?:string|null;suggestions?:Suggestion[];id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;usedModel?:string;error?:string};
+type WorldView={decision?:Decision|null;memory?:PlayerMemory;protagonist?:PlayerProfile;journal?:Quest[];confirmedRequestId?:string|null;suggestions?:Suggestion[];id:string;revision:number;day:number;minute:number;location:string;messages:Msg[];usage?:{totalTokens?:number}|null;usedModel?:string;error?:string};
 type WorldEntry={id:string;name:string;revision:number;created:string};
 type ServerAI={userId?:string;allowed:boolean;providers:{ai:{ready:boolean;models:string[]};openrouter:{ready:boolean;models:string[]}}};
-type Pending={op?:'turn'|'advance-time';advanceMinutes?:number;world:string;revision:number;requestId:string;text:string;mode:Mode;model:string};
+type Pending={op?:'turn'|'advance-time'|'fast-forward';advanceMinutes?:number;limitMinutes?:number;target?:string;world:string;revision:number;requestId:string;text:string;mode:Mode;model:string};
 const worldKey='wendao-v3-chat-first-world';
 const pendingKey='wendao-v3-pending-turn';
 const preferencesKey='wendao-v3-ai-preferences';
 export default function V3(){
+ const [decision,setDecision]=useState<Decision|null>(null);
+ const [fastOpen,setFastOpen]=useState(false),[fastLimit,setFastLimit]=useState(1440),[fastTarget,setFastTarget]=useState('');
  const [memory,setMemory]=useState<PlayerMemory|null>(null),[profile,setProfile]=useState<PlayerProfile|null>(null);
  const [notebookOpen,setNotebookOpen]=useState(false);const notebookDialog=useRef<HTMLDialogElement>(null);
  const [build,setBuild]=useState<{release:string;revision:string|null}|null>(null);
@@ -54,6 +59,7 @@ export default function V3(){
  }
  function applyWorld(world:WorldView){
   if(!world.id||!Array.isArray(world.messages))throw Error('世界資料格式錯誤');
+  setDecision(world.decision||null);setFastOpen(false);
   setMemory(world.memory||null);setProfile(world.protagonist||null);
   setWorldId(world.id);setMessages(world.messages);setTurn(world.revision);
   setDay(world.day);setMinute(world.minute);setLocation(world.location);setSuggestions(world.suggestions||[]);setJournal(world.journal||[]);
@@ -184,7 +190,7 @@ export default function V3(){
    }
    if(!window.confirm('確定取消這筆待確認回合？若請求還在處理，可能稍後才寫入；不會刪除已保存的劇情。'))return;
    rememberPending(null);
-   setText(waiting.op==='advance-time'?'':waiting.text);
+   setText(waiting.op==='advance-time'||waiting.op==='fast-forward'?'':waiting.text);
    setError('已解除輸入鎖定。請先到 AI 設定改用伺服器允許的模型，再重新送出。');
   }catch{setError('無法確認伺服器存檔狀態，暫時保留回合以避免重複提交。')}
   finally{setLoading(false);}
@@ -213,11 +219,13 @@ export default function V3(){
   }catch(e){setError(e instanceof Error?e.message:'清除紀錄失敗');}
   finally{setLoading(false);}
  }
- async function send(advanceMinutes?:number){
-  const value=text.trim();if(inFlight.current||busy||testing||loading||!worldId||(!pendingRef.current&&!value&&!advanceMinutes))return;
-  const request:Pending=pendingRef.current||{op:advanceMinutes?'advance-time':'turn',advanceMinutes,world:worldId,revision:turn,requestId:crypto.randomUUID(),text:advanceMinutes?'等待時間流逝':value,mode,model:model.trim()};
+ async function send(options?:{text?:string;fastForward?:FastForward}){
+  const value=(options?.text??text).trim(),fastForward=options?.fastForward;
+  if(inFlight.current||busy||testing||loading||!worldId||(!pendingRef.current&&!value&&!fastForward))return;
+  if(!pendingRef.current&&fastForward&&decision){setError('請先回應眼前的選擇，也可以拒絕或自由輸入其他行動。');return;}
+  const request:Pending=pendingRef.current||{op:fastForward?'fast-forward':'turn',...fastForward,world:worldId,revision:turn,requestId:crypto.randomUUID(),text:fastForward?fastForwardText(fastForward):value,mode,model:model.trim()};
   if(request.mode!=='demo'&&!serverAI?.providers[request.mode]?.ready){setSettings(true);setError('此帳號的伺服器 AI 尚未設定完成，請確認 Cloudflare 金鑰與使用者授權。');return;}
-  inFlight.current=true;setBusy(true);setError('');setText('');followLatest.current=true;
+  inFlight.current=true;setBusy(true);setError('');setText('');setFastOpen(false);followLatest.current=true;
   try{
    rememberPending(request);
    const res=await fetch('/api/v3/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...request,op:request.op||'turn'})});
@@ -232,7 +240,7 @@ export default function V3(){
     throw Error(data.error||'回合提交失敗');
    }
    applyWorld(data);rememberPending(null);setText('');
-  }catch(e){setText(request.text);setError(e instanceof Error?e.message:'連線失敗，請重試同一回合')}
+  }catch(e){if(request.op!=='fast-forward')setText(request.text);setError(e instanceof Error?e.message:'連線失敗，請重試同一回合')}
   finally{setBusy(false);inFlight.current=false;requestAnimationFrame(()=>composer.current?.focus())}
  }
  return <main className="v3-shell" data-reading={reading}>
@@ -243,7 +251,7 @@ export default function V3(){
   <label className="v3-world-select"><span className="v3-sr-only">世界線</span><select aria-label="世界線" value={worldId} disabled={busy||loading||!!pending} onChange={e=>void switchWorld(e.target.value)}>{worlds.map(w=><option key={w.id} value={w.id}>{w.name.replace('問道九州 V3 · ','')} · {w.created.slice(5,10)} · {w.id.slice(0,4)}</option>)}</select></label>
   <div className="v3-world-card"><BookOpen size={18}/><div><strong>洛河的世界</strong><p>第 {day} 日 · {location}</p><small>{turn>0?'故事已記下 '+turn+' 次變化':'一切，從一聲問候開始'}</small></div></div>
   <button className="v3-journal-button" onClick={()=>{setJournalOpen(true);setSidebar(false)}} disabled={loading}><BookOpen size={16}/>任務手札 <span>{journal.length}</span></button>
-  <details className="v3-time-wait"><summary>在此等待 · 推進時間</summary><p>留在目前位置，讓 NPC 與世界繼續發展。</p><div>{[{minutes:15,label:'15 分鐘'},{minutes:60,label:'1 小時'},{minutes:360,label:'6 小時'},{minutes:1440,label:'1 天'}].map(option=><button key={option.minutes} disabled={busy||loading||!!pending||!!text.trim()} onClick={()=>{setSidebar(false);void send(option.minutes)}}>+ {option.label}</button>)}</div></details>
+  <div className="v3-life-rhythm"><span className="v3-sidebar-label">故事的節奏</span><p>慢慢聊，或略過一段日常。<br/>重要的選擇，留給你。</p></div>
   <div className="v3-sidebar-bottom"><button className="v3-dev-shortcut" disabled={busy||loading||!!pending} onClick={()=>{setDeveloperTab('memory');setDev(true);setSidebar(false)}}><BookOpen size={16}/>開發者 · 世界記憶</button><p>你可以問候、追問、拒絕，<br/>也可以暫時什麼都不做。</p><button onClick={()=>{setSettings(true);setSidebar(false)}}><Settings2 size={16}/> AI 與閱讀設定</button><small className="v3-build-label" title={build?.revision||'本機開發版本'}>{GAME_RELEASE_NAME} · {GAME_RELEASE}<br/>{build?build.release!==GAME_RELEASE?'前後端版本不同，請重新整理':build.revision?build.revision.slice(0,7):'本機開發版':'伺服器版本待確認'}</small></div>
  </aside>
  {sidebar&&<button className="v3-sidebar-scrim" aria-label="收起導航" onClick={()=>setSidebar(false)}/>}
@@ -253,10 +261,11 @@ export default function V3(){
    <section className="v3-messages" aria-label="故事對話" aria-busy={busy||loading}>
     {loading?<div className="v3-world-loading" role="status"><LoaderCircle size={20}/>正在翻開你的故事……</div>:<>
      {messages.length>visibleCount?<button className="v3-older" onClick={showOlder}>閱讀較早的對話（還有 {messages.length-visibleCount} 則）</button>:<div className="v3-chapter"><span>卷 一</span><h2>山門初見</h2><p>一段問候，也能成為故事的開始。</p></div>}
-     {messages.slice(-visibleCount).map((m,i)=>{const index=messages.length-Math.min(messages.length,visibleCount)+i;return <article key={worldId+':'+index} className={m.role==='user'?'v3-user':'v3-assistant'}><div className="v3-label">{m.role==='user'?<><span className="v3-avatar">洛</span>洛河</>:<><span className="v3-narrator-mark">◇</span>問道九州 <span className="v3-label-muted">· 此刻</span></>}</div><div className="v3-content"><StoryText text={m.content}/></div>{m.role==='assistant'&&<button className="v3-copy v3-icon" title={copied===index?'已複製':'複製這段故事'} aria-label={copied===index?'已複製':'複製這段故事'} onClick={()=>void copyMessage(m.content,index)}>{copied===index?<Check size={14}/>:<Copy size={14}/>}</button>}</article>})}
+     {messages.slice(-visibleCount).map((m,i)=>{const index=messages.length-Math.min(messages.length,visibleCount)+i;return <article key={worldId+':'+index} className={m.role==='user'?'v3-user':'v3-assistant'}><div className="v3-label">{m.role==='user'?<><span className="v3-avatar">洛</span>洛河</>:<><span className="v3-narrator-mark">◇</span>問道九州 <span className="v3-label-muted">· 此刻</span></>}</div><div className="v3-content">{m.fastForward&&<p className="v3-time-passed">略過日常 · 經過 {m.fastForward.elapsedMinutes>=1440?Math.floor(m.fastForward.elapsedMinutes/1440)+' 天 '+Math.floor(m.fastForward.elapsedMinutes%1440/60)+' 小時':m.fastForward.elapsedMinutes>=60?Math.floor(m.fastForward.elapsedMinutes/60)+' 小時 '+m.fastForward.elapsedMinutes%60+' 分鐘':m.fastForward.elapsedMinutes+' 分鐘'}{m.fastForward.stoppedForDecision?' · 在選擇前停下':''}</p>}<StoryText text={m.content}/></div>{m.role==='assistant'&&<button className="v3-copy v3-icon" title={copied===index?'已複製':'複製這段故事'} aria-label={copied===index?'已複製':'複製這段故事'} onClick={()=>void copyMessage(m.content,index)}>{copied===index?<Check size={14}/>:<Copy size={14}/>}</button>}</article>})}
      {pending&&<article className="v3-user v3-pending"><div className="v3-label"><span className="v3-avatar">洛</span>洛河 <span className="v3-label-muted">· {busy?'已送出，等待回覆':'等待確認'}</span></div><div className="v3-content"><StoryText text={pending.text}/></div></article>}
      {busy&&<div className="v3-waiting" role="status"><span className="v3-thinking-dots"><i/><i/><i/></span><div>{elapsed>=20?'還在等候模型回覆，請稍候…':'故事正在接續…'}<small>{elapsed>=20?'免費模型回覆較慢時，這個回合會等待確認。':'回覆確認前，先不要重複送出。'}</small></div><span className="v3-wait-time">{elapsed}s</span></div>}
-     {!busy&&!pending&&suggestions.length>0&&<div className="v3-reply-options"><div className="v3-options-heading"><Sparkles size={14}/><span>可選的回應</span><small>點一下帶入，可改寫再送出</small></div><div className="v3-option-grid">{suggestions.map(action=><button key={action.text} onClick={()=>chooseSuggestion(action.text)}><span>{action.label}</span><ChevronRight size={14}/></button>)}</div><p>也可以直接寫下你自己的對話或行動。</p></div>}
+     {!busy&&!pending&&(decision||suggestions.length>0)&&<section className={'v3-choice-card'+(decision?' needs-choice':'')} aria-label="當下的選擇"><div className="v3-options-heading"><Sparkles size={15}/><span>{decision?'輪到你決定':'你可以這樣回應'}</span></div>{decision&&<h3>{decision.question}</h3>}<div className="v3-choice-list">{suggestions.map((action,i)=><div className="v3-choice-row" key={action.text}><button className="v3-choice-action" disabled={busy||loading||testing||!!text.trim()} onClick={()=>void send({text:action.text})}><span className="v3-choice-number">{i+1}</span><span><strong>{action.label}</strong><small>{action.text}</small></span><ChevronRight size={15}/></button><button className="v3-choice-edit" aria-label={'改寫：'+action.label} disabled={loading||testing} onClick={()=>chooseSuggestion(action.text)}><Pencil size={14}/><span>改寫</span></button></div>)}</div><p>{text.trim()?'輸入區已有草稿，送出或清空後可直接選擇。':'點選即採取行動；也可以改寫，或在下方自由輸入。'}</p></section>}
+
     </>}
     <div ref={bottom}/>
    </section>
@@ -266,6 +275,8 @@ export default function V3(){
    {error&&<div className="v3-error" role="alert"><span>{error}</span>{!pending&&<button aria-label="關閉提示" className="v3-icon" onClick={()=>setError('')}><X size={14}/></button>}</div>}
    {pending&&!busy&&<div className="v3-retry-note"><span>上一回合尚待確認。重試不會重複推進世界。</span><div className="v3-retry-buttons"><button disabled={loading||testing} onClick={()=>void checkPending()}>確認存檔狀態</button><button disabled={loading||testing} onClick={()=>void send()}>重試上一回合</button><button disabled={loading||testing} onClick={()=>void cancelPending()}>取消待確認／修改模型</button></div></div>}
    {mode!=='demo'&&!loading&&!serverAI?.providers[mode]?.ready&&<div className="v3-connect-note"><span>伺服器尚未開啟這個 AI 模型服務。</span><button onClick={()=>setSettings(true)}>查看伺服器模型設定 <ChevronRight size={12}/></button></div>}
+   <div className="v3-pace-controls"><button disabled={busy||loading||testing||!!pending||!!decision||!!text.trim()} onClick={()=>void send({text:'繼續'})}><Play size={14}/>接著演</button><button aria-expanded={fastOpen} disabled={busy||loading||testing||!!pending||!!decision||!!text.trim()} onClick={()=>setFastOpen(!fastOpen)}><FastForward size={15}/>略過日常</button><span>{decision?'有件事等你決定；可以選擇、拒絕或另提做法。':'節奏由你決定，重要事件會停下。'}</span></div>
+   {fastOpen&&<form className="v3-fast-forward" onSubmit={e=>{e.preventDefault();void send({fastForward:{limitMinutes:fastLimit,target:fastTarget.trim()}})}}><div><strong>快進到下一個值得參與的事件</strong><button type="button" className="v3-icon" aria-label="收起快進" onClick={()=>setFastOpen(false)}><X size={16}/></button></div><p>選擇最長略過的時間；遇到重大選擇會提早停下。一次推進一段，回覆後由你接手。</p><label>最多略過<select aria-label="快進時間上限" value={fastLimit} onChange={e=>setFastLimit(Number(e.target.value))}>{FAST_FORWARD_LIMITS.map(option=><option value={option.minutes} key={option.minutes}>{option.label}</option>)}</select></label><label>想快進到哪裡？（可留空）<input aria-label="快進目標" maxLength={160} placeholder="例如：收徒典禮、閉關結束；重大決定仍由我選" value={fastTarget} onChange={e=>setFastTarget(e.target.value)}/></label><button type="submit" disabled={busy||loading||testing||!!decision||!!text.trim()}><FastForward size={15}/>開始快進</button></form>}
    <div className="v3-composer-box"><textarea ref={composer} aria-label="你的對話或行動" value={text} maxLength={2500} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&!window.matchMedia('(pointer: coarse)').matches){e.preventDefault();void send()}}} placeholder="說一句話，或做一件你想做的事…" disabled={busy||loading||!!pending} rows={2}/><div className="v3-composer-bottom"><span>{pending?'確認上一回合後，就能繼續接話':text.length>2000?`${text.length} / 2500`:'你的選擇，由你決定。'}</span><button className="v3-send" aria-label={busy?'等候回覆':'送出對話'} onClick={()=>void send()} disabled={busy||testing||loading||!!pending||!worldId||!text.trim()}>{busy?<LoaderCircle size={19}/>:<ArrowUp size={19}/>}</button></div></div>
    <div className="v3-composer-hint"><span>{busy?'等待回覆中':pending?'待確認':turn>0?'已保存 · 第 '+turn+' 次變化':'自由對話 · 世界會記住你的行動'}</span><span className="v3-keyboard-hint">Enter 送出 · Shift + Enter 換行</span></div>
   </footer>

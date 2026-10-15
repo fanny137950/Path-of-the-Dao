@@ -1,3 +1,4 @@
+import {fastForwardRequest,fastForwardText,fastForwardDirective,assertCanFastForward} from '../../../../v3/server/fast-forward.mjs';
 // @ts-ignore - append-only memory history
 import {historyArchive,correctMemory,serializeWorldSave} from '../../../../v3/server/memory-system.mjs';
 // @ts-ignore - bounded original conversation roles
@@ -80,7 +81,7 @@ export async function POST(request:Request){
     .bind(id,user.userId,'問道九州 V3 · 洛河',0,JSON.stringify(world),new Date().toISOString()).run();
    return reply(playerWorld(world),201);
   }
-  if(!['turn','advance-time','edit-character','manage-task','edit-memory'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
+  if(!['turn','advance-time','fast-forward','edit-character','manage-task','edit-memory'].includes(body.op)||typeof body.world!=='string'||!/^[0-9a-f-]{36}$/.test(body.world))return reply({error:'未知操作'},400);
   const world=await readWorld(body.world,user.userId);
   if(!world)return reply({error:'找不到 V3 世界'},404);
   if(body.op==='edit-memory'){
@@ -113,19 +114,21 @@ export async function POST(request:Request){
    if(result.meta.changes!==1)return reply({error:'世界資料已更新，請重試'},409);
    return reply({world:playerWorld(next),developer:developerWorld(next)});
   }
+  const fastForward=body.op==='fast-forward'?fastForwardRequest(body):null;
   const requestedMinutes=body.advanceMinutes;
   const isTimeAdvance=body.op==='advance-time';
   if(isTimeAdvance&&![15,60,360,1440].includes(requestedMinutes))
    return reply({error:'時間只能推進 15 分鐘、1 小時、6 小時或 1 天'},400);
   const text=isTimeAdvance
    ?'洛河選擇在目前位置等待'+({15:'一刻鐘',60:'一個時辰的一半（約一小時）',360:'六個小時',1440:'一整天'} as Record<number,string>)[requestedMinutes]+'，留意周遭的人事變化。'
-   :body.text;
+   :fastForward?fastForwardText(fastForward):body.text;
   if(typeof text!=='string'||!text.trim()||text.length>2500)return reply({error:'玩家輸入無效'},400);
   if(typeof body.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(body.requestId))return reply({error:'回合 ID 無效'},400);
   const identity=turnIdentity(body,text);
   const check=checkTurnRequest(world,body.requestId,identity);
   if(check.error)return reply({error:check.error},check.status);
   if(check.replayed)return reply({...playerWorld(world),usage:null});
+  if(fastForward||isTimeAdvance)assertCanFastForward(world);
   if(world.events.filter((e:{type:string})=>e.type==='conversation').length>=1000)return reply({error:'試玩世界已達1000回合上限，請先備份'},409);
   const mode=body.mode;
   if(!['demo','ai','openrouter'].includes(mode))return reply({error:'未知對話模式'},400);
@@ -136,14 +139,16 @@ export async function POST(request:Request){
   const actingWorld=world;
   let answer:string,usage:null|{totalTokens?:number}=null;
   let usedModel:string=mode==='demo'?'示範模式':'';
-  if(mode==='demo')answer=isTimeAdvance
+  if(mode==='demo')answer=fastForward
+   ?'洛河沿著已安排的日常度過一段時間，周遭的宗務照常運作。\n\n（示範模式只測試快進與存檔，不會生成 AI 事件。）\n<!--GM_STATE:'+JSON.stringify({elapsedMinutes:Math.min(60,fastForward.limitMinutes),decision:null})+'-->'
+   :isTimeAdvance
    ?'洛河在原處等待，時間緩緩流逝。來往弟子換了幾批，周遭的宗務照常運作。\n\n（示範模式不會產生動態 NPC 對話，請使用 AI 模式體驗故事。）'
    :'韓守一合起名冊，仔細聽完洛河的話。\n\n「你想問便問；想去看看也行。山門今日很熱鬧，不必照著別人的腳步走。」\n\n（示範模式只供測試存檔；自然對話請選 OpenRouter 或 OpenAI。）';
   else{
    const timeDirective=isTimeAdvance
     ?'\n\n【玩家已選時間推進】本次將在伺服器準確推進'+requestedMinutes+'分鐘；洛河只是在現址等待，沒有同意移動、拜師或戰鬥。請自然描寫這段時間的環境與 NPC 行動；如事件未被當場得知，不得讓洛河憑空知道隱藏真相。若無人與她互動，描述具體可觀察的日常變化，不要只是複述上一幕。'
-    :'';
-   const args={apiKey:selected!.apiKey,instructions:GM_INSTRUCTIONS+timeDirective,conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false,advanceMinutes:isTimeAdvance?requestedMinutes:0}),maxOutputTokens:4000};
+    :fastForward?fastForwardDirective(fastForward):'';
+   const args={apiKey:selected!.apiKey,instructions:GM_INSTRUCTIONS+timeDirective,conversation:providerConversation(actingWorld,text),input:gmContext(actingWorld,text,{includeDialogue:false,advanceMinutes:isTimeAdvance?requestedMinutes:fastForward?.limitMinutes||0}),maxOutputTokens:4000};
    const generate=(instruction:string)=>mode==='openrouter'
     ?generateOpenRouterResponse({...args,instructions:instruction,model:model||'openrouter/free'})
     :generateGMResponse({...args,instructions:instruction,model:model||'gpt-4.1-mini'});
@@ -152,7 +157,7 @@ export async function POST(request:Request){
   }
 
   const next=commitV3Turn(actingWorld,text,answer,body.requestId,
-   isTimeAdvance?{advanceMinutes:requestedMinutes}:{});
+   isTimeAdvance?{advanceMinutes:requestedMinutes}:fastForward?{fastForward}:{});
   const committed=next.events.find((event:{requestId?:string})=>event.requestId===body.requestId);
   committed.request=identity;
   // Compare-and-swap: no partial turn or lost concurrent update.
