@@ -43,7 +43,7 @@
 2. GitHub Actions → **Deploy V3 to Cloudflare** → **Run workflow**，選 `codex/ensemble-story-deployment`，確認文字輸入 `wendao-living-world`。
 3. 完成後開啟 `/v3`。側欄應顯示「記憶與世界 · memory-1」及部署 commit 的前 7 碼。
 
-`GET /api/v3/version` 回傳 release 與完整部署 SHA。Workflow 部署後核對 SHA，避免只看到首頁 HTTP 200 卻無法判斷版本。`keep_vars` 保留既有 Cloudflare 變數；API 金鑰仍由伺服器 secrets 管理。
+`GET /api/v3/version` 回傳 release 與完整部署 SHA。Workflow 部署後核對 SHA 與 `/v3`，最多重試 8 次以容許新版本傳播；持續 404、非 JSON、舊 SHA 或遊戲頁錯誤都仍會失敗。API 路徑優先由 Worker 處理。Smoke-test 失敗不會自動回滾先前已上傳的 Worker；請依紀錄中的路徑、HTTP 狀態與 SHA 檢查，而不是直接認定上傳失敗。`keep_vars` 保留既有 Cloudflare 變數；API 金鑰仍由伺服器 secrets 管理。
 
 若既有伺服器 AI 金鑰及使用者授權已設定，可直接使用原帳號接續舊世界；否則設定頁會標明缺少的授權或服務。示範模式只驗證介面與存檔，不能代表 AI 敘事效果。
 

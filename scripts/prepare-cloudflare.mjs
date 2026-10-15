@@ -9,6 +9,8 @@ export function standaloneConfig(base, { account, database, name = 'wendao-livin
   if (revision && !/^[a-f0-9]{40}$/i.test(revision)) throw Error('Invalid build revision');
   return {
     ...base, name, topLevelName: name, ...(local ? {} : { account_id: account }), workers_dev: true, keep_vars: true,
+    // API requests must reach the Worker, including the public version probe.
+    assets: { ...base.assets, run_worker_first: ['/api/*'] },
     vars: { ...(revision ? {GAME_BUILD_SHA:revision} : {}), AUTH_MODE: 'standalone', GAME_OWNER_ID: 'standalone-owner', GAME_DEVELOPER_USER_IDS: 'standalone-owner' },
     d1_databases: [{ binding: 'DB', database_name: name, database_id: local ? placeholder : database, migrations_dir: '../../drizzle' }],
     services: [], r2_buckets: [],

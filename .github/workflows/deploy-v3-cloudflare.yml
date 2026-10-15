@@ -73,13 +73,5 @@ jobs:
       - name: Deploy Worker and assets
         run: pnpm exec wrangler deploy --config dist/server/wrangler.standalone.json
 
-      - name: Smoke-test site
-        shell: bash
-        run: |
-          set -euo pipefail
-          STATUS=$(curl -sS -L -o /dev/null -w '%{http_code}' --max-time 30             https://wendao-living-world.danew137950.workers.dev/)
-          [[ "$STATUS" == '200' ]] || { echo "Site returned HTTP $STATUS"; exit 1; }
-          curl --fail --silent --show-error --max-time 30 \
-            https://wendao-living-world.danew137950.workers.dev/api/v3/version \
-            | jq -e --arg sha "$GITHUB_SHA" '.revision == $sha and .release == "memory-1"'
-          echo 'Deployed V3 site and build revision verified.'
+      - name: Smoke-test site and deployed revision
+        run: node scripts/check-deployed-v3.mjs
